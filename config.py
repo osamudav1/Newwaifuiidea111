@@ -50,7 +50,7 @@ SUPPORT_CHAT    = _str("SUPPORT_CHAT")
 UPDATE_CHANNEL  = _str("UPDATE_CHANNEL")
 
 # ── Waifu API ─────────────────────────────────────────────────────────────────
-WAIFU_API_URL   = _str("WAIFU_API_URL", "https://wafus.vercel.app")
+WAIFU_API_URL   = _str("WAIFU_API_URL", "YUKI_027d60ef7a1041771d0791836260daf7")
 WAIFU_API_KEY   = _str("WAIFU_API_KEY")
 
 # ── Economy ───────────────────────────────────────────────────────────────────
