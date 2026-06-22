@@ -2,7 +2,7 @@ import glob
 import os
 from os.path import basename, dirname, isfile, relpath
 
-from YUKIWAFUS.logging import LOGGER
+from YUKIWAFUS.Logging import LOGGER
 
 
 def _list_all_modules():
