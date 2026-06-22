@@ -6,7 +6,7 @@ from pyrogram.types import Message
 import config
 from YUKIWAFUS import app
 from YUKIWAFUS.Logging import LOGGER
-from YUKIWAFUS.utils.api import add_waifu, find_waifu
+from YUKIWAFUS.database.Mangodb import collectiondb  # ✅ MongoDB တိုက်ရိုက်
 
 log = LOGGER
 
@@ -83,55 +83,56 @@ async def addwaifu_handler(client: Client, message: Message):
     if img_url and not img_url.startswith(("http://", "https://")) and not img_url.startswith("tg://"):
         return await message.reply_text("❌ Invalid image URL/File ID!")
 
-    # ── Check duplicate ──────────────────────────────────────────────────────
-    existing = await find_waifu(name)
+    # ── CHECK DUPLICATE (MongoDB တိုက်ရိုက်) ──────────────────────────────
+    existing = await collectiondb.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}})
     if existing:
-        exact = [w for w in existing if w["name"].lower() == name.lower()]
-        if exact:
-            return await message.reply_text(
-                f"⚠️ <b>{escape(name)}</b> already exists in database!",
-                parse_mode=enums.ParseMode.HTML
-            )
+        return await message.reply_text(
+            f"⚠️ <b>{escape(name)}</b> already exists in database!",
+            parse_mode=enums.ParseMode.HTML
+        )
 
-    # ── Add via API ───────────────────────────────────────────────────────────
-    processing = await message.reply_text("⏳ Adding waifu via API...")
-    result = await add_waifu(
-        api_key=config.WAIFU_API_KEY,
-        name=name,
-        img_url=img_url,
-        rarity=rarity,
-        event_tag=event_tag,
-        source_message_id=message.id,
-        added_by=user.first_name,
-    )
-
-    if not result:
-        return await processing.edit_text("❌ Failed to add waifu. Check API or try again.")
-
-    await processing.delete()
-    emoji = RARITY_EMOJI.get(rarity, "◈")
-    await message.reply_photo(
-        photo=img_url,
-        caption=f"✅ <b>Waifu Added!</b>\n\n📛 <b>{escape(name)}</b>\n{emoji} {rarity} • 🏷 {event_tag}",
-        parse_mode=enums.ParseMode.HTML
-    )
-
-    # ── Log to channel ────────────────────────────────────────────────────────
+    # ── SAVE TO MONGODB DIRECTLY (API မသုံးတော့ဘူး) ────────────────────────
+    processing = await message.reply_text("⏳ Saving waifu to database...")
     try:
-        log_caption = build_log_caption(
-            name=name,
-            rarity=rarity,
-            event_tag=event_tag,
-            img_url=img_url,
-            added_by_name=user.first_name,
-            added_by_id=user.id,
-            source_msg_id=message.id,
-        )
-        await client.send_photo(
-            chat_id=config.LOG_CHANNEL,
+        doc = {
+            "name": name,
+            "img_url": img_url,
+            "rarity": rarity,
+            "event_tag": event_tag,
+            "source_message_id": message.id,
+            "added_by": user.first_name,
+            "Date": datetime.utcnow().strftime("%d/%m/%Y")
+        }
+        await collectiondb.insert_one(doc)
+        await processing.delete()
+
+        # ── Success reply ──────────────────────────────────────────────────────
+        emoji = RARITY_EMOJI.get(rarity, "◈")
+        await message.reply_photo(
             photo=img_url,
-            caption=log_caption,
-            parse_mode=enums.ParseMode.HTML,
+            caption=f"✅ <b>Waifu Added!</b>\n\n📛 <b>{escape(name)}</b>\n{emoji} {rarity} • 🏷 {event_tag}",
+            parse_mode=enums.ParseMode.HTML
         )
+
+        # ── Log to channel ─────────────────────────────────────────────────────
+        try:
+            log_caption = build_log_caption(
+                name=name,
+                rarity=rarity,
+                event_tag=event_tag,
+                img_url=img_url,
+                added_by_name=user.first_name,
+                added_by_id=user.id,
+                source_msg_id=message.id,
+            )
+            await client.send_photo(
+                chat_id=config.LOG_CHANNEL,
+                photo=img_url,
+                caption=log_caption,
+                parse_mode=enums.ParseMode.HTML,
+            )
+        except Exception as e:
+            LOGGER.error(f"Logger failed: {e}")
+
     except Exception as e:
-        LOGGER.error(f"Logger failed: {e}")
+        await processing.edit_text(f"❌ Failed to save waifu: {e}")
