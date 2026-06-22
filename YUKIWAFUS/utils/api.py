@@ -1,6 +1,8 @@
 import aiohttp
 from config import WAIFU_API_URL
-from YUKIWAFUS.logging import LOGGER
+
+# ✅ FIX 1: Import ကို capital L နဲ့ ပြင်ပါ
+from YUKIWAFUS.Logging import LOGGER
 
 BASE_URL = WAIFU_API_URL
 
@@ -21,10 +23,11 @@ async def _get(endpoint: str, params: dict = None) -> dict | None:
         async with session.get(f"{BASE_URL}{endpoint}", params=params) as resp:
             if resp.status == 200:
                 return await resp.json()
-            LOGGER(__name__).error(f"API GET error {resp.status} → {endpoint}")
+            # ✅ FIX 2: LOGGER(__name__) ကို LOGGER လို့ ပြင်ပါ
+            LOGGER.error(f"API GET error {resp.status} → {endpoint}")
             return None
     except Exception as e:
-        LOGGER(__name__).error(f"API GET failed: {e}")
+        LOGGER.error(f"API GET failed: {e}")
         return None
 
 
@@ -35,10 +38,10 @@ async def _post(endpoint: str, json: dict, api_key: str) -> dict | None:
         async with session.post(f"{BASE_URL}{endpoint}", json=json, headers=headers) as resp:
             if resp.status == 200:
                 return await resp.json()
-            LOGGER(__name__).error(f"API POST error {resp.status} → {endpoint}")
+            LOGGER.error(f"API POST error {resp.status} → {endpoint}")
             return None
     except Exception as e:
-        LOGGER(__name__).error(f"API POST failed: {e}")
+        LOGGER.error(f"API POST failed: {e}")
         return None
 
 
@@ -49,10 +52,10 @@ async def _put(endpoint: str, params: dict, json: dict, api_key: str) -> dict | 
         async with session.put(f"{BASE_URL}{endpoint}", params=params, json=json, headers=headers) as resp:
             if resp.status == 200:
                 return await resp.json()
-            LOGGER(__name__).error(f"API PUT error {resp.status} → {endpoint}")
+            LOGGER.error(f"API PUT error {resp.status} → {endpoint}")
             return None
     except Exception as e:
-        LOGGER(__name__).error(f"API PUT failed: {e}")
+        LOGGER.error(f"API PUT failed: {e}")
         return None
 
 
@@ -63,10 +66,10 @@ async def _delete(endpoint: str, params: dict, api_key: str) -> dict | None:
         async with session.delete(f"{BASE_URL}{endpoint}", params=params, headers=headers) as resp:
             if resp.status == 200:
                 return await resp.json()
-            LOGGER(__name__).error(f"API DELETE error {resp.status} → {endpoint}")
+            LOGGER.error(f"API DELETE error {resp.status} → {endpoint}")
             return None
     except Exception as e:
-        LOGGER(__name__).error(f"API DELETE failed: {e}")
+        LOGGER.error(f"API DELETE failed: {e}")
         return None
 
 
@@ -172,5 +175,4 @@ async def close_session():
     global _session
     if _session and not _session.closed:
         await _session.close()
-        LOGGER(__name__).info("API session closed.")
-      
+        LOGGER.info("API session closed.")
