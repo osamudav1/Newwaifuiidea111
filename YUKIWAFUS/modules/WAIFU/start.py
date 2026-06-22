@@ -92,24 +92,26 @@ def btn(
     style: str          = None,
     emoji_id: str       = None,
 ) -> dict | None:
-    """Returns button dict, or None if URL is invalid/empty."""
     b = {"text": text}
 
     if callback_data:
         b["callback_data"] = callback_data
     elif url:
         u = str(url).strip()
-        # Validate URL — must be a real link
         if not u:
             return None
-        if not u.startswith("http") and not u.startswith("tg://"):
+        # ✅ FIX: tg:// URLs are valid
+        if u.startswith("tg://"):
+            b["url"] = u
+        elif not u.startswith("http"):
             u = f"https://t.me/{u.lstrip('@')}"
-        # Extra guard: bare https://t.me/ is invalid
-        if u in ("https://t.me/", "https://t.me", "http://t.me/"):
-            return None
-        b["url"] = u
+            if u in ("https://t.me/", "https://t.me", "http://t.me/"):
+                return None
+            b["url"] = u
+        else:
+            b["url"] = u
     else:
-        return None   # no action = useless button
+        return None
 
     if style in ("primary", "success", "danger"):
         b["style"] = style
@@ -119,17 +121,21 @@ def btn(
 
 
 def _row(*buttons) -> list:
-    """Build a row, skipping None buttons."""
     return [b for b in buttons if b is not None]
 
 
 def _private_panel() -> list:
-    bot_username = app.username or ""
+    # ✅ FIX: Use get_me() instead of app.username
+    try:
+        bot_username = app.get_me().username
+    except:
+        bot_username = ""
+
     rows = []
 
     rows.append(_row(
         btn("𝚫ᴅᴅ ᴛᴏ ɢʀᴏᴜᴘ ✧",
-            url=f"https://t.me/{bot_username}?startgroup=true",
+            url=f"https://t.me/{bot_username}?startgroup=true" if bot_username else None,
             style="success", emoji_id="5235682785863153026"),
     ))
 
@@ -153,10 +159,15 @@ def _private_panel() -> list:
 
 
 def _group_panel() -> list:
-    bot_username = app.username or ""
+    # ✅ FIX: Use get_me() instead of app.username
+    try:
+        bot_username = app.get_me().username
+    except:
+        bot_username = ""
+
     return [_row(
         btn("˹ 𝐃ᴍ ᴍᴇ ˼",
-            url=f"https://t.me/{bot_username}?start=hi",
+            url=f"https://t.me/{bot_username}?start=hi" if bot_username else None,
             style="success", emoji_id="5249244862359812334"),
         btn("˹ 𝐒ᴜᴘᴘᴏʀᴛ ˼",
             url=config.SUPPORT_CHAT, style="danger", emoji_id="5206523956537865948"),
@@ -218,7 +229,6 @@ async def send_magic_start(
     if reply_to_id:
         payload["reply_to_message_id"] = reply_to_id
 
-    # ── Try 1: photo + effect, then inject markup separately ─────────────────
     res = await _bot_api("sendPhoto", payload)
     if res.get("ok"):
         msg_id = res["result"]["message_id"]
@@ -226,7 +236,6 @@ async def send_magic_start(
             await _inject_markup(chat_id, msg_id, raw_kb)
         return msg_id
 
-    # ── Try 2: photo + markup together (no effect) ────────────────────────────
     payload2 = {k: v for k, v in payload.items() if k != "message_effect_id"}
     if raw_kb:
         payload2["reply_markup"] = {"inline_keyboard": raw_kb}
@@ -235,7 +244,6 @@ async def send_magic_start(
     if res2.get("ok"):
         return res2["result"]["message_id"]
 
-    # ── Try 3: Pyrogram fallback (no effect, plain Pyrogram buttons) ──────────
     try:
         rows = []
         for row in raw_kb:
@@ -260,7 +268,6 @@ async def send_magic_start(
     except Exception:
         pass
 
-    # ── Try 4: TEXT fallback (no photo at all) — last resort ──────────────────
     try:
         rows = []
         for row in raw_kb:
@@ -334,7 +341,6 @@ async def start_private(client: Client, message: Message):
 
     await _register_user(user.id, user.username or "", user.first_name)
 
-    # Reaction
     try:
         await client.send_reaction(
             chat_id=chat_id,
@@ -345,7 +351,6 @@ async def start_private(client: Client, message: Message):
     except Exception:
         pass
 
-    # Fire effect
     try:
         await _bot_api("sendMessage", {
             "chat_id":           chat_id,
@@ -357,7 +362,6 @@ async def start_private(client: Client, message: Message):
 
     await asyncio.sleep(0.5)
 
-    # Build caption
     bot_me      = await client.get_me()
     mention     = f"<a href='tg://user?id={user.id}'>{escape(user.first_name)}</a>"
     bot_mention = f"<a href='tg://user?id={bot_me.id}'>{escape(bot_me.first_name)}</a>"
@@ -391,7 +395,6 @@ async def start_private(client: Client, message: Message):
         except Exception:
             pass
 
-    # Logger
     if await is_logger_on() and config.LOG_CHANNEL:
         try:
             await app.send_message(
