@@ -1,14 +1,17 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI
-from YUKIWAFUS.logging import LOGGER
 
-LOGGER(__name__).info("Connecting to MongoDB...")
+# ✅ FIX 1: import ကို capital L နဲ့ ပြင်ပါ
+from YUKIWAFUS.Logging import LOGGER
+
+# ✅ FIX 2: LOGGER(__name__) ကို LOGGER လို့ ပြင်ပါ
+LOGGER.info("Connecting to MongoDB...")
 try:
     _mongo_ = AsyncIOMotorClient(MONGO_DB_URI)
     mongodb = _mongo_.YUKIWAFUS
-    LOGGER(__name__).info("Connected to MongoDB ✓")
+    LOGGER.info("Connected to MongoDB ✓")
 except Exception as e:
-    LOGGER(__name__).error(f"MongoDB connection failed: {e}")
+    LOGGER.error(f"MongoDB connection failed: {e}")
     exit()
 
 # ── Collections ───────────────────────────────────────────────────────────────
