@@ -6,10 +6,13 @@ from pyrogram.types import Message
 
 import config
 from YUKIWAFUS import app
-from YUKIWAFUS.logging import LOGGER
+
+# ✅ FIX 1: Import ကို capital L နဲ့ ပြင်ပါ
+from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.utils.api import add_waifu, find_waifu
 
-log = LOGGER(__name__)
+# ✅ FIX 2: LOGGER(__name__) ကို LOGGER လို့ ပြင်ပါ
+log = LOGGER
 
 RARITY_EMOJI = {
     "Common":    "⚪",
@@ -168,7 +171,8 @@ async def addwaifu_handler(client: Client, message: Message):
             parse_mode=enums.ParseMode.HTML,
         )
     except Exception as e:
-        log.error(f"Logger failed: {e}")
+        # ✅ FIX 3: log.error ကို LOGGER.error လို့ ပြင်ပါ
+        LOGGER.error(f"Logger failed: {e}")
 
 
 # ── /delwaifu Command ─────────────────────────────────────────────────────────
@@ -217,4 +221,3 @@ async def findwaifu_handler(client: Client, message: Message):
         text += f"\n<i>...and {len(results) - 5} more</i>"
 
     await message.reply_text(text, parse_mode=enums.ParseMode.HTML)
-  
