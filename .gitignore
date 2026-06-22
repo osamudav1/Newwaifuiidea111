@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# Virtual Environment
+venv/
+env/
+.env/
+.venv/
+
+# Environment / Secrets
+.env
+Simple.env
+config.env
+*.env
+secrets.json
+
+# Logs
+*.log
+log.txt
+logs/
+
+# Session files (IMPORTANT - never commit these)
+*.session
+*.session-journal
+Shivu.session
+Shivu.session-journal
+
+# Database
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+.dockerignore
+
+# Temp / Cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+tmp/
+temp/
+
+# Uploads / Media
+uploads/
+downloads/
+media/
