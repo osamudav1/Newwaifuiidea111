@@ -8,7 +8,7 @@ import config
 from YUKIWAFUS import LOGGER, app
 from YUKIWAFUS.modules import ALL_MODULES
 
-_log = LOGGER(__name__)
+_log = LOGGER
 
 
 async def init():
