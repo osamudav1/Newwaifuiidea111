@@ -1,9 +1,8 @@
 import logging
-from YUKIWAFUS.logging import LOGGER
+from YUKIWAFUS.Logging import LOGGER  # object
 from pyrogram import Client
 import config
 
-# ── Bot Client ────────────────────────────────────────────────────────────────
 app = Client(
     "YUKIWAFUS",
     api_id=config.API_ID,
@@ -11,5 +10,4 @@ app = Client(
     bot_token=config.BOT_TOKEN,
 )
 
-# ── Export ────────────────────────────────────────────────────────────────────
 __all__ = ["app", "LOGGER"]
