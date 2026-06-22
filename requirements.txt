@@ -1,0 +1,46 @@
+# ── Telegram ──────────────────────────────
+pyrogram==2.0.106
+TgCrypto
+
+# ── Database ──────────────────────────────
+motor==3.3.2
+pymongo==4.6.1
+dnspython
+
+# ── Async ─────────────────────────────────
+asyncio
+aiohttp==3.9.3
+aiofiles
+
+# ── Image Processing ──────────────────────
+Pillow==10.2.0
+pillow-heif
+cairosvg
+
+# ── HTTP / API ────────────────────────────
+requests==2.31.0
+httpx
+urllib3
+
+# ── Games / Logic ─────────────────────────
+python-dotenv==1.0.1
+apscheduler==3.10.4
+cachetools
+psutil
+# ── Utils ─────────────────────────────────
+python-dateutil
+pytz
+humanize
+orjson
+pydantic
+
+# ── Scheduler / Background ────────────────
+APScheduler==3.10.4
+
+# ── Logging ───────────────────────────────
+colorlog==6.8.2
+
+# ── Web (optional - health check) ─────────
+flask==3.0.2
+uvicorn
+fastapi
