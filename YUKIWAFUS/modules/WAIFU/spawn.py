@@ -3,7 +3,7 @@ import random
 import time
 
 from pyrogram import Client, enums, filters
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 import config
 from YUKIWAFUS import app
@@ -243,7 +243,7 @@ async def spawn_waifu(client: Client, chat_id: int):
 @app.on_message(filters.command("spawnon") & filters.group)
 async def spawnon_handler(client: Client, message: Message):
     member = await client.get_chat_member(message.chat.id, message.from_user.id)
-    if member.status.value not in ("administrator", "creator"):
+    if member.status.value not in ("administrator", "creator") and message.from_user.id not in (config.SUDO_USERS + [config.OWNER_ID]):
         return await message.reply_text(f"❌ {sc('Admins only!')}")
 
     await set_chat_spawn(message.chat.id, True)
@@ -253,7 +253,7 @@ async def spawnon_handler(client: Client, message: Message):
 @app.on_message(filters.command("spawnoff") & filters.group)
 async def spawnoff_handler(client: Client, message: Message):
     member = await client.get_chat_member(message.chat.id, message.from_user.id)
-    if member.status.value not in ("administrator", "creator"):
+    if member.status.value not in ("administrator", "creator") and message.from_user.id not in (config.SUDO_USERS + [config.OWNER_ID]):
         return await message.reply_text(f"❌ {sc('Admins only!')}")
 
     await set_chat_spawn(message.chat.id, False)
@@ -276,13 +276,9 @@ async def fspawn_handler(client: Client, message: Message):
     asyncio.create_task(spawn_waifu(client, chat_id))
 
 
-# ── /setspawn ─────────────────────────────────────────────────────────────────
-@app.on_message(filters.command("setspawn") & filters.group)
+# ── /setspawn (Owner & Sudo Only) ─────────────────────────────────────────────────────────────────
+@app.on_message(filters.command("setspawn") & filters.user(config.SUDO_USERS + [config.OWNER_ID]))
 async def setspawn_handler(client: Client, message: Message):
-    member = await client.get_chat_member(message.chat.id, message.from_user.id)
-    if member.status.value not in ("administrator", "creator"):
-        return await message.reply_text(f"❌ {sc('Admins only!')}")
-
     if len(message.command) < 2:
         current = SPAWN_AFTER
         doc = await chatsdb.find_one({"chat_id": message.chat.id})
@@ -316,4 +312,16 @@ async def setspawn_handler(client: Client, message: Message):
         f"✅ {sc('Spawn rate set to')} <b>{count} {sc('messages')}</b>!",
         parse_mode=enums.ParseMode.HTML,
     )
-    
+
+# ── /search ───────────────────────────────────────────────────────────────────
+@app.on_message(filters.command("search"))
+async def search_cmd_handler(client: Client, message: Message):
+    bot_me = await client.get_me()
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔨 SEARCH CHARACTERS", switch_inline_query_current_chat="")]
+    ])
+    await message.reply_text(
+        "⬜ <b>TO SEARCH CHARACTER CLICK ON BUTTON BELOW</b>",
+        reply_markup=keyboard,
+        parse_mode=enums.ParseMode.HTML
+    )
