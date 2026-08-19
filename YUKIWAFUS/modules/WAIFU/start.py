@@ -9,6 +9,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 import config
 from YUKIWAFUS import app
+from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.database.Mangodb import usersdb, chatsdb, onoffdb
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -124,12 +125,10 @@ def _row(*buttons) -> list:
     return [b for b in buttons if b is not None]
 
 
-def _private_panel() -> list:
-    # ✅ FIX: Use get_me() instead of app.username
-    try:
-        bot_username = app.get_me().username
-    except:
-        bot_username = ""
+def _private_panel(bot_username: str = "") -> list:
+    # The caller already awaited get_me(); do not call the async method
+    # synchronously here, otherwise the URL button silently disappears.
+    bot_username = (bot_username or "").lstrip("@")
 
     rows = []
 
@@ -158,12 +157,10 @@ def _private_panel() -> list:
     return rows
 
 
-def _group_panel() -> list:
-    # ✅ FIX: Use get_me() instead of app.username
-    try:
-        bot_username = app.get_me().username
-    except:
-        bot_username = ""
+def _group_panel(bot_username: str = "") -> list:
+    # The caller already awaited get_me(); do not call the async method
+    # synchronously here, otherwise the URL button silently disappears.
+    bot_username = (bot_username or "").lstrip("@")
 
     return [_row(
         btn("˹ 𝐃ᴍ ᴍᴇ ˼",
@@ -297,8 +294,12 @@ async def send_magic_start(
 # ✅ DB HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 async def is_logger_on() -> bool:
-    doc = await onoffdb.find_one({"key": "logger"})
-    return doc.get("value", True) if doc else True
+    try:
+        doc = await onoffdb.find_one({"key": "logger"})
+        return doc.get("value", True) if doc else True
+    except Exception as exc:
+        LOGGER.warning("Logger state unavailable: %s", exc)
+        return False
 
 
 async def set_logger(enabled: bool):
@@ -310,25 +311,43 @@ async def set_logger(enabled: bool):
 
 
 async def _register_user(user_id: int, username: str, first_name: str):
-    await usersdb.update_one(
-        {"user_id": user_id},
-        {
-            "$set":         {"username": username or "", "first_name": first_name},
-            "$setOnInsert": {"user_id": user_id},
-        },
-        upsert=True,
-    )
+    try:
+        await usersdb.update_one(
+            {"user_id": user_id},
+            {
+                "$set":         {"username": username or "", "first_name": first_name},
+                "$setOnInsert": {"user_id": user_id},
+            },
+            upsert=True,
+        )
+        return True
+    except Exception as exc:
+        LOGGER.warning("/start user registration skipped: %s", exc)
+        return False
 
 
 async def _register_chat(chat_id: int, title: str):
-    await chatsdb.update_one(
-        {"chat_id": chat_id},
-        {
-            "$set":         {"title": title},
-            "$setOnInsert": {"chat_id": chat_id},
-        },
-        upsert=True,
-    )
+    try:
+        await chatsdb.update_one(
+            {"chat_id": chat_id},
+            {
+                "$set":         {"title": title},
+                "$setOnInsert": {"chat_id": chat_id},
+            },
+            upsert=True,
+        )
+        return True
+    except Exception as exc:
+        LOGGER.warning("/start chat registration skipped: %s", exc)
+        return False
+
+
+async def _safe_count(collection, label: str) -> int:
+    try:
+        return await collection.count_documents({})
+    except Exception as exc:
+        LOGGER.warning("/start %s count unavailable: %s", label, exc)
+        return 0
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -365,8 +384,8 @@ async def start_private(client: Client, message: Message):
     bot_me      = await client.get_me()
     mention     = f"<a href='tg://user?id={user.id}'>{escape(user.first_name)}</a>"
     bot_mention = f"<a href='tg://user?id={bot_me.id}'>{escape(bot_me.first_name)}</a>"
-    users       = await usersdb.count_documents({})
-    chats_count = await chatsdb.count_documents({})
+    users       = await _safe_count(usersdb, "user")
+    chats_count = await _safe_count(chatsdb, "chat")
 
     caption = _START_PRIVATE.format(
         mention=mention,
@@ -380,7 +399,7 @@ async def start_private(client: Client, message: Message):
         chat_id,
         random.choice(WAIFU_PICS),
         caption,
-        _private_panel(),
+        _private_panel(bot_me.username),
         effect_id=EFFECT_HEARTS,
     )
 
@@ -439,7 +458,7 @@ async def start_group(client: Client, message: Message):
         chat_id,
         random.choice(WAIFU_PICS),
         caption,
-        _group_panel(),
+        _group_panel(bot_me.username),
         reply_to_id=message.id,
         effect_id=EFFECT_CONFETTI,
     )
@@ -486,7 +505,7 @@ async def on_bot_added(client: Client, message: Message):
         )
 
         msg = await message.reply_text(text, parse_mode=enums.ParseMode.HTML)
-        await _inject_markup(message.chat.id, msg.id, _group_panel())
+        await _inject_markup(message.chat.id, msg.id, _group_panel(bot_me.username))
 
         if await is_logger_on() and config.LOG_CHANNEL:
             try:
@@ -528,8 +547,8 @@ async def back_to_home_cb(client, cq):
     bot_me      = await client.get_me()
     mention     = f"<a href='tg://user?id={user.id}'>{escape(user.first_name)}</a>"
     bot_mention = f"<a href='tg://user?id={bot_me.id}'>{escape(bot_me.first_name)}</a>"
-    users       = await usersdb.count_documents({})
-    chats_count = await chatsdb.count_documents({})
+    users       = await _safe_count(usersdb, "user")
+    chats_count = await _safe_count(chatsdb, "chat")
 
     caption = _START_PRIVATE.format(
         mention=mention,
@@ -544,7 +563,7 @@ async def back_to_home_cb(client, cq):
         "message_id":   cq.message.id,
         "caption":      caption,
         "parse_mode":   "HTML",
-        "reply_markup": {"inline_keyboard": _private_panel()},
+        "reply_markup": {"inline_keyboard": _private_panel(bot_me.username)},
     })
 
     if not ok.get("ok"):
@@ -582,20 +601,20 @@ async def logger_cmd(client: Client, message: Message):
     if arg == "enable":
         await set_logger(True)
         await message.reply_text(
-            f"<blockquote><emoji id='6001483331709966655'>✅</emoji> "
-            f"<b>ʟᴏɢɢᴇʀ ᴇɴᴀʙʟᴇᴅ!</b></blockquote>",
+            "<blockquote><emoji id='6001483331709966655'>✅</emoji> "
+            "<b>ʟᴏɢɢᴇʀ ᴇɴᴀʙʟᴇᴅ!</b></blockquote>",
             parse_mode=enums.ParseMode.HTML,
         )
     elif arg == "disable":
         await set_logger(False)
         await message.reply_text(
-            f"<blockquote><emoji id='5998834801472182366'>❌</emoji> "
-            f"<b>ʟᴏɢɢᴇʀ ᴅɪsᴀʙʟᴇᴅ!</b></blockquote>",
+            "<blockquote><emoji id='5998834801472182366'>❌</emoji> "
+            "<b>ʟᴏɢɢᴇʀ ᴅɪsᴀʙʟᴇᴅ!</b></blockquote>",
             parse_mode=enums.ParseMode.HTML,
         )
     else:
         await message.reply_text(
-            f"<blockquote><emoji id='6001602353843672777'>⚠️</emoji> "
-            f"<b>ɪɴᴠᴀʟɪᴅ.</b> Use <code>enable</code> or <code>disable</code>.</blockquote>",
+            "<blockquote><emoji id='6001602353843672777'>⚠️</emoji> "
+            "<b>ɪɴᴠᴀʟɪᴅ.</b> Use <code>enable</code> or <code>disable</code>.</blockquote>",
             parse_mode=enums.ParseMode.HTML,
         )
