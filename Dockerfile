@@ -13,15 +13,20 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
-RUN pip3 install --upgrade pip setuptools wheel
+# The base Python image already includes pip. Avoid self-upgrading during
+# builds because transient PyPI 5xx responses can fail the whole deployment.
 
 # Copy code
 COPY . /app/
 WORKDIR /app/
 
 # Install deps
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install \
+    --disable-pip-version-check \
+    --no-cache-dir \
+    --retries 10 \
+    --timeout 120 \
+    -r requirements.txt
 
 # Run
 CMD ["python3", "-m", "YUKIWAFUS"]
