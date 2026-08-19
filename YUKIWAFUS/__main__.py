@@ -1,4 +1,3 @@
-import asyncio
 import importlib
 import os
 import threading
@@ -60,6 +59,8 @@ async def init():
 
     _log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     _log.info(f"  ✦ Loaded  : {len(loaded)} modules")
+    handler_count = sum(len(group) for group in app.dispatcher.groups.values())
+    _log.info(f"  ✦ Handlers: {handler_count}")
     if failed:
         _log.warning(f"  ✗ Failed  : {len(failed)} → {failed}")
     _log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -74,7 +75,7 @@ async def init():
         try:
             await app.send_message(
                 config.LOG_CHANNEL,
-                f"<blockquote>⚠️ <b>Failed to load modules:</b></blockquote>\n\n"
+                "<blockquote>⚠️ <b>Failed to load modules:</b></blockquote>\n"
                 + "\n".join(f"• <code>{m}</code>" for m in failed),
                 parse_mode="html",
             )
@@ -88,5 +89,10 @@ async def init():
 
 if __name__ == "__main__":
     start_health_server()
-    asyncio.run(init())
+    # `Client` creates its dispatcher on the event loop available during
+    # package import.  Reusing that same loop is required because Pyrogram's
+    # decorator registration schedules handler-install tasks on it.  Using
+    # asyncio.run() here creates a different loop and leaves every handler
+    # unregistered, making the live bot silently ignore all commands.
+    app.loop.run_until_complete(init())
     
