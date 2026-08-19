@@ -1,6 +1,7 @@
 services:
-  - type: worker
+  - type: web
     name: YUKIWAFUS
+    healthCheckPath: /health
     runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: python3 -m YUKIWAFUS
