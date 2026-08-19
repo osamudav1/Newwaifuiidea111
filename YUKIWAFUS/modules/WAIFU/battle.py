@@ -11,7 +11,8 @@ from pyrogram.types import (
 )
 
 from YUKIWAFUS import app
-from YUKIWAFUS.database.Mangodb import collectiondb, balancedb
+from YUKIWAFUS.database.Mangodb import collectiondb, balancedb, game_statsdb
+from YUKIWAFUS.utils.helpers import sc
 
 # ── Rarity Power ──────────────────────────────────────────────────────────────
 RARITY_POWER = {
@@ -216,6 +217,11 @@ async def battle_accept(client: Client, cq: CallbackQuery):
     if winner_id:
         new_balance = await add_coins(winner_id, BATTLE_REWARD)
 
+    challenger_delta = {"battles": 1, "wins": int(winner_id == challenger_id), "losses": int(winner_id == opponent_id)}
+    opponent_delta = {"battles": 1, "wins": int(winner_id == opponent_id), "losses": int(winner_id == challenger_id)}
+    await game_statsdb.update_one({"user_id": challenger_id}, {"$inc": challenger_delta}, upsert=True)
+    await game_statsdb.update_one({"user_id": opponent_id}, {"$inc": opponent_delta}, upsert=True)
+
     # ── Build Result ──────────────────────────────────────────────────────────
     last_round = rounds[-1] if rounds else (0, 0, c_hp, o_hp)
     _, _, final_c_hp, final_o_hp = last_round
@@ -265,5 +271,23 @@ async def battle_decline(client: Client, cq: CallbackQuery):
     await cq.answer("Battle declined.")
     await cq.message.edit_caption(
         "🏃 Battle was declined!",
+        parse_mode=enums.ParseMode.HTML,
+    )
+
+
+@app.on_message(filters.command("battlestats"))
+async def battlestats_handler(client: Client, message: Message):
+    user_id = message.from_user.id
+    stats = await game_statsdb.find_one({"user_id": user_id}) or {}
+    battles = int(stats.get("battles", 0))
+    wins = int(stats.get("wins", 0))
+    losses = int(stats.get("losses", 0))
+    draws = max(0, battles - wins - losses)
+    await message.reply_text(
+        f"<blockquote>⚔️ <b>Battle Statistics</b></blockquote>\n\n"
+        f"🎮 {sc('Battles')}: <b>{battles}</b>\n"
+        f"🏆 {sc('Wins')}: <b>{wins}</b>\n"
+        f"💔 {sc('Losses')}: <b>{losses}</b>\n"
+        f"🤝 {sc('Draws')}: <b>{draws}</b>",
         parse_mode=enums.ParseMode.HTML,
     )

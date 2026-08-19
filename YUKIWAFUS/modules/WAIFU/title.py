@@ -74,7 +74,7 @@ async def get_equipped_title(user_id: int) -> str | None:
 # ✅ /titles — BROWSE SHOP
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.on_message(filters.command(["titles", "titleshop", "titlemenu"]))
+@app.on_message(filters.command(["titles", "titleshop", "titlemenu", "title", "shop"]))
 async def titles_cmd(client: Client, message: Message):
     user_id = message.from_user.id
     await _send_titles_page(message, page=0, user_id=user_id, edit=False)
@@ -336,7 +336,7 @@ async def title_buy_cancel_cb(client: Client, cq: CallbackQuery):
 # ✅ /equipt — EQUIP TITLE
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.on_message(filters.command("equipt"))
+@app.on_message(filters.command(["equipt", "equip"]))
 async def equipt_cmd(client: Client, message: Message):
     user_id = message.from_user.id
 
@@ -397,7 +397,7 @@ async def equipt_cmd(client: Client, message: Message):
 # ✅ /unequipt — UNEQUIP
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.on_message(filters.command("unequipt"))
+@app.on_message(filters.command(["unequipt", "unequip"]))
 async def unequipt_cmd(client: Client, message: Message):
     user_id  = message.from_user.id
     equipped = await get_equipped_title(user_id)

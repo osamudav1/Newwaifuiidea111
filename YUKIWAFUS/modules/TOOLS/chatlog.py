@@ -137,3 +137,18 @@ async def left_watcher(client: Client, message: Message):
     except Exception:
         pass
   
+
+
+@app.on_message(filters.command("chatlog") & filters.user(config.SUDO_USERS + [config.OWNER_ID]))
+async def chatlog_handler(client: Client, message: Message):
+    chats = await chatsdb.find({}).sort("title", 1).to_list(100)
+    if not chats:
+        return await message.reply_text("📋 No tracked groups yet.")
+
+    lines = ["<blockquote>📋 <b>Tracked Groups</b></blockquote>"]
+    for chat in chats:
+        title = chat.get("title") or "Untitled"
+        chat_id = chat.get("chat_id")
+        status = "✅" if chat.get("active", True) else "❌"
+        lines.append(f"{status} <b>{title}</b> — <code>{chat_id}</code>")
+    await message.reply_text("\n".join(lines), parse_mode=enums.ParseMode.HTML)

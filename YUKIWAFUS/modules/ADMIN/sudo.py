@@ -1,3 +1,4 @@
+import asyncio
 from html import escape
 
 from pyrogram import Client, enums, filters
@@ -5,7 +6,7 @@ from pyrogram.types import Message
 
 import config
 from YUKIWAFUS import app
-from YUKIWAFUS.database.Mangodb import sudoersdb
+from YUKIWAFUS.database.Mangodb import sudoersdb, usersdb
 from YUKIWAFUS.utils.helpers import sc
 
 
@@ -40,7 +41,7 @@ async def remove_sudo(user_id: int):
 
 
 # ── /addsudo ──────────────────────────────────────────────────────────────────
-@app.on_message(filters.command(["addsudo", "addsudo"]) & filters.user(config.OWNER_ID))
+@app.on_message(filters.command(["addsudo", "sudoadd"]) & filters.user(config.OWNER_ID))
 async def addsudo_handler(client: Client, message: Message):
     user_id = None
     name = None
@@ -142,3 +143,39 @@ async def sudolist_handler(client: Client, message: Message):
                 text += f"  ◈ <code>{uid}</code>\n"
 
     await message.reply_text(text, parse_mode=enums.ParseMode.HTML)
+
+
+# ── /broadcast ────────────────────────────────────────────────────────────────
+@app.on_message(filters.command("broadcast") & filters.user(config.SUDO_USERS + [config.OWNER_ID]))
+async def broadcast_handler(client: Client, message: Message):
+    """Broadcast a replied message or text to all registered private users."""
+    target = message.reply_to_message
+    text = " ".join(message.command[1:]).strip() if len(message.command) > 1 else ""
+
+    if target is None and not text:
+        return await message.reply_text(
+            f"📢 {sc('Reply to a message or use /broadcast <text>.')}"
+        )
+
+    sent = 0
+    failed = 0
+    async for user in usersdb.find({"user_id": {"$exists": True}}, {"user_id": 1}):
+        user_id = user.get("user_id")
+        if not user_id:
+            continue
+        try:
+            if target is not None:
+                await target.copy(chat_id=user_id)
+            else:
+                await client.send_message(user_id, text)
+            sent += 1
+            await asyncio.sleep(0.05)
+        except Exception:
+            failed += 1
+
+    await message.reply_text(
+        f"✅ {sc('Broadcast complete.')}\n"
+        f"📨 {sc('Sent')}: <b>{sent}</b>\n"
+        f"⚠️ {sc('Failed')}: <b>{failed}</b>",
+        parse_mode=enums.ParseMode.HTML,
+    )

@@ -129,8 +129,6 @@ _HELP = {
         "<b>/trade</b> <code>&lt;my_id&gt; &lt;their_id&gt;</code> — <code>ᴛʀᴀᴅᴇ ᴡᴀɪғᴜs</code>\n"
         "<emoji id='6291835288561917135'>🛒</emoji> "
         "<b>/shop</b> — <code>ʙʀᴏᴡsᴇ ᴛʜᴇ ᴡᴀɪғᴜ sʜᴏᴘ</code>\n"
-        "<emoji id='5238162283368035495'>🎰</emoji> "
-        "<b>/gacha</b> — <code>sᴘᴇɴᴅ ᴛᴏᴋᴇɴs ғᴏʀ ʀᴀʀɪᴛʏ ᴘᴜʟʟ</code>"
         "</blockquote>"
     ),
 
@@ -192,8 +190,6 @@ _HELP = {
         "<b>/addtitle</b> / <b>/deltitle</b> — <code>ᴍᴀɴᴀɢᴇ ᴛɪᴛʟᴇs</code>\n"
         "<emoji id='6001483331709966655'>💰</emoji> "
         "<b>/addcoins</b> / <b>/deduct</b> — <code>ᴍᴀɴᴀɢᴇ ᴄᴏɪɴs</code>\n"
-        "<emoji id='5249244862359812334'>🛒</emoji> "
-        "<b>/addshop</b> — <code>ᴀᴅᴅ ᴡᴀɪғᴜ ᴛᴏ sʜᴏᴘ</code>\n"
         "<emoji id='6291835288561917135'>⚡</emoji> "
         "<b>/fspawn</b> — <code>ғᴏʀᴄᴇ sᴘᴀᴡɴ ᴀ ᴡᴀɪғᴜ</code>"
         "</blockquote>"
