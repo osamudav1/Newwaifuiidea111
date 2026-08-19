@@ -133,7 +133,7 @@ async def add_waifu(
     rarity: str,
     event_tag: str = "Standard",
     source_message_id: int = 0,
-    added_by: str = "YUKIWAFUS",
+    added_by: str = "OSAMU",
 ) -> dict | None:
     """Add a new waifu to the database."""
     payload = {

@@ -308,7 +308,7 @@ async def generate_profile_card(
     _draw_rarity_bar(draw, rarity_counts, len(waifus))
 
     # ── Watermark ────────────────────────────────────────────────────────────
-    wm = "✦ YUKIWAFUS"
+    wm = "✦ OSAMU"
     f_wm = _font(13)
     bbox = draw.textbbox((0, 0), wm, font=f_wm)
     draw.text((CARD_W - (bbox[2] - bbox[0]) - 14, CARD_H - 18), wm, font=f_wm, fill=(50, 40, 75))

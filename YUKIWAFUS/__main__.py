@@ -65,7 +65,7 @@ async def init():
     _log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     _log.info(
         "╔═════ஜ۩۞۩ஜ════╗\n"
-        "  ✦ YUKIWAFUS Started ✦\n"
+        "  ✦ OSAMU Started ✦\n"
         "╚═════ஜ۩۞۩ஜ════╝"
     )
 
