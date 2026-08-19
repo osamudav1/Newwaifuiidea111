@@ -6,6 +6,7 @@ from pyrogram.types import Message
 
 import config
 from YUKIWAFUS import app
+from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.database.Mangodb import sudoersdb, usersdb
 from YUKIWAFUS.utils.helpers import sc
 
@@ -159,19 +160,25 @@ async def broadcast_handler(client: Client, message: Message):
 
     sent = 0
     failed = 0
-    async for user in usersdb.find({"user_id": {"$exists": True}}, {"user_id": 1}):
-        user_id = user.get("user_id")
-        if not user_id:
-            continue
-        try:
-            if target is not None:
-                await target.copy(chat_id=user_id)
-            else:
-                await client.send_message(user_id, text)
-            sent += 1
-            await asyncio.sleep(0.05)
-        except Exception:
-            failed += 1
+    try:
+        async for user in usersdb.find({"user_id": {"$exists": True}}, {"user_id": 1}):
+            user_id = user.get("user_id")
+            if not user_id:
+                continue
+            try:
+                if target is not None:
+                    await target.copy(chat_id=user_id)
+                else:
+                    await client.send_message(user_id, text)
+                sent += 1
+                await asyncio.sleep(0.05)
+            except Exception:
+                failed += 1
+    except Exception as exc:
+        LOGGER.exception("/broadcast database iteration failed: %s", exc)
+        return await message.reply_text(
+            f"❌ {sc('Broadcast failed because the user database is unavailable.')}",
+        )
 
     await message.reply_text(
         f"✅ {sc('Broadcast complete.')}\n"

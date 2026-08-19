@@ -85,7 +85,6 @@ async def detail_reply_handler(client: Client, message: Message):
 
 # ── AUTO SAVE (Caption ရှိရင်) ──────────────────────────────────────────
 async def auto_addwaifu_handler(client: Client, message: Message):
-    user = message.from_user
     photo = message.photo
     file_id = photo.file_id
     img_url = file_id
@@ -117,7 +116,11 @@ async def save_waifu(client, message, name, img_url, rarity, event_tag):
     user = message.from_user
     
     # Check duplicate in waifudb (Master database)
-    existing = await waifudb.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}})
+    try:
+        existing = await waifudb.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}})
+    except Exception as exc:
+        LOGGER.exception("/addwaifu duplicate check failed: %s", exc)
+        return await message.reply_text("❌ Waifu database is unavailable. Please try again after MongoDB is online.")
     if existing:
         return await message.reply_text(
             f"⚠️ <b>{escape(name)}</b> already exists in database!",

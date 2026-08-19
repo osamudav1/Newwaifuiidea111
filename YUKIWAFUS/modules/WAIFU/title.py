@@ -552,9 +552,15 @@ async def addtitle_cmd(client: Client, message: Message):
     description = parts[2] if len(parts) > 2 else ""
 
     # Check duplicate
-    if await titlesdb.find_one(
-        {"type": "catalog", "name": {"$regex": f"^{name}$", "$options": "i"}}
-    ):
+    try:
+        duplicate = await titlesdb.find_one(
+            {"type": "catalog", "name": {"$regex": f"^{name}$", "$options": "i"}}
+        )
+    except Exception:
+        return await message.reply_text(
+            f"❌ {sc('Title database is unavailable. Please try again later.')}",
+        )
+    if duplicate:
         return await message.reply_text(
             f"<blockquote>⚠️ <b>{sc('A title with this name already exists')}!</b></blockquote>",
             parse_mode=enums.ParseMode.HTML,
@@ -562,15 +568,20 @@ async def addtitle_cmd(client: Client, message: Message):
 
     title_id = str(uuid.uuid4())[:8].upper()
 
-    await titlesdb.insert_one({
-        "type":        "catalog",
-        "title_id":    title_id,
-        "name":        name,
-        "price":       price,
-        "description": description,
-        "created_at":  datetime.utcnow(),
-        "created_by":  message.from_user.id,
-    })
+    try:
+        await titlesdb.insert_one({
+            "type":        "catalog",
+            "title_id":    title_id,
+            "name":        name,
+            "price":       price,
+            "description": description,
+            "created_at":  datetime.utcnow(),
+            "created_by":  message.from_user.id,
+        })
+    except Exception:
+        return await message.reply_text(
+            f"❌ {sc('Title could not be saved. Please try again later.')}",
+        )
 
     emoji, rarity = get_tier(price)
 

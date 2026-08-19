@@ -3,6 +3,7 @@ from pyrogram.types import Message
 
 import config
 from YUKIWAFUS import app
+from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.database.Mangodb import gbansdb
 from YUKIWAFUS.utils.helpers import sc
 
@@ -31,11 +32,16 @@ async def gban_handler(client: Client, message: Message):
     if user_id == config.OWNER_ID:
         return await message.reply_text(f"👑 {sc('The owner cannot be globally banned.')}")
 
-    await gbansdb.update_one(
-        {"user_id": user_id},
-        {"$set": {"user_id": user_id, "banned_by": message.from_user.id}},
-        upsert=True,
-    )
+    try:
+        await gbansdb.update_one(
+            {"user_id": user_id},
+            {"$set": {"user_id": user_id, "banned_by": message.from_user.id}},
+            upsert=True,
+        )
+    except Exception as exc:
+        LOGGER.exception("/gban database update failed: %s", exc)
+        return await message.reply_text(f"❌ {sc('Global ban failed because the database is unavailable.')}")
+
     await message.reply_text(f"🚫 {sc('User globally banned')}: <code>{user_id}</code>", parse_mode=enums.ParseMode.HTML)
 
 
@@ -47,7 +53,11 @@ async def ungban_handler(client: Client, message: Message):
             f"❌ {sc('Reply to a user or use /ungban <user_id>.')}"
         )
 
-    result = await gbansdb.delete_one({"user_id": user_id})
+    try:
+        result = await gbansdb.delete_one({"user_id": user_id})
+    except Exception as exc:
+        LOGGER.exception("/ungban database delete failed: %s", exc)
+        return await message.reply_text(f"❌ {sc('Global unban failed because the database is unavailable.')}")
     status = sc("User globally unbanned") if result.deleted_count else sc("User was not globally banned")
     await message.reply_text(f"✅ {status}: <code>{user_id}</code>", parse_mode=enums.ParseMode.HTML)
 

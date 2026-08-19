@@ -61,6 +61,13 @@ async def init():
     _log.info(f"  ✦ Loaded  : {len(loaded)} modules")
     handler_count = sum(len(group) for group in app.dispatcher.groups.values())
     _log.info(f"  ✦ Handlers: {handler_count}")
+    _log.info(
+        "  ✦ Admin config: owner_set=%s, sudo_count=%s",
+        bool(config.OWNER_ID),
+        len(config.SUDO_USERS),
+    )
+    if not config.OWNER_ID:
+        _log.error("OWNER_ID is missing or invalid; protected commands will be ignored")
     if failed:
         _log.warning(f"  ✗ Failed  : {len(failed)} → {failed}")
     _log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

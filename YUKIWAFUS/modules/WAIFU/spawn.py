@@ -7,6 +7,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 import config
 from YUKIWAFUS import app
+from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.database.Mangodb import chatsdb
 from YUKIWAFUS.utils.api import get_random_waifu
 from YUKIWAFUS.utils.helpers import sc
@@ -268,12 +269,23 @@ async def fspawn_handler(client: Client, message: Message):
     if chat_id in active_spawns:
         return await message.reply_text(f"⚠️ {sc('A waifu is already active here!')}")
 
-    try:
-        await message.delete()
-    except Exception:
-        pass
+    status = await message.reply_text(f"⏳ {sc('Spawning a waifu')}...")
 
-    asyncio.create_task(spawn_waifu(client, chat_id))
+    async def _run_force_spawn():
+        try:
+            await spawn_waifu(client, chat_id)
+            try:
+                await status.delete()
+            except Exception:
+                pass
+        except Exception as exc:
+            LOGGER.exception("/fspawn failed: %s", exc)
+            try:
+                await status.edit_text(f"❌ {sc('Force spawn failed. Check the bot log.')}")
+            except Exception:
+                pass
+
+    asyncio.create_task(_run_force_spawn())
 
 
 # ── /setspawn (Owner & Sudo Only) ─────────────────────────────────────────────────────────────────
@@ -316,7 +328,6 @@ async def setspawn_handler(client: Client, message: Message):
 # ── /search ───────────────────────────────────────────────────────────────────
 @app.on_message(filters.command("search"))
 async def search_cmd_handler(client: Client, message: Message):
-    bot_me = await client.get_me()
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔨 SEARCH CHARACTERS", switch_inline_query_current_chat="")]
     ])

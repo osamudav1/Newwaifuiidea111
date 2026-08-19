@@ -1,4 +1,5 @@
 import os
+import re
 
 from dotenv import load_dotenv
 
@@ -13,7 +14,9 @@ for _env_name in (".env", "Simple.env", "simple.env"):
 
 def _int(key: str, default: int = 0) -> int:
     """Safe int parser — returns default if empty or non-numeric."""
-    val = os.getenv(key, "").strip()
+    val = os.getenv(key, "").strip().strip("[](){}")
+    # Accept values copied with a trailing comma or semicolon from dashboards.
+    val = re.split(r"[;,\s]+", val, maxsplit=1)[0] if val else ""
     try:
         return int(val) if val else default
     except ValueError:
@@ -22,11 +25,11 @@ def _int(key: str, default: int = 0) -> int:
 
 def _list(key: str) -> list[int]:
     """Parse space-separated int list — skips non-numeric tokens."""
-    val = os.getenv(key, "").strip()
+    val = os.getenv(key, "").strip().strip("[](){}")
     if not val:
         return []
     result = []
-    for token in val.split():
+    for token in re.split(r"[;,\s]+", val):
         token = token.strip()
         if token.lstrip("-").isdigit():
             result.append(int(token))
