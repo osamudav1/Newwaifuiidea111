@@ -6,6 +6,7 @@ ENV PYTHONUNBUFFERED=1
 # System deps
 RUN apt-get update && apt-get install -y \
     git \
+    build-essential \
     ffmpeg \
     libcairo2-dev \
     pkg-config \
