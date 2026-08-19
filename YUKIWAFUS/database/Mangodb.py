@@ -1,18 +1,24 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB_URI
 
-# ✅ FIX 1: import ကို capital L နဲ့ ပြင်ပါ
 from YUKIWAFUS.Logging import LOGGER
 
-# ✅ FIX 2: LOGGER(__name__) ကို LOGGER လို့ ပြင်ပါ
+if not MONGO_DB_URI:
+    raise RuntimeError(
+        "MongoDB URI is missing. Set MONGO_DB_URI (or MONGO_URL) "
+        "in the environment before starting the bot."
+    )
+
 LOGGER.info("Connecting to MongoDB...")
 try:
-    _mongo_ = AsyncIOMotorClient(MONGO_DB_URI)
+    _mongo_ = AsyncIOMotorClient(
+        MONGO_DB_URI,
+        serverSelectionTimeoutMS=10_000,
+    )
     mongodb = _mongo_.YUKIWAFUS
-    LOGGER.info("Connected to MongoDB ✓")
+    LOGGER.info("MongoDB client initialized ✓")
 except Exception as e:
-    LOGGER.error(f"MongoDB connection failed: {e}")
-    exit()
+    raise RuntimeError(f"MongoDB connection failed: {e}") from e
 
 # ── Collections ───────────────────────────────────────────────────────────────
 

@@ -11,7 +11,7 @@ services:
         sync: false
       - key: BOT_TOKEN
         sync: false
-      - key: MONGO_URL
+      - key: MONGO_DB_URI
         sync: false
       - key: OWNER_ID
         sync: false

@@ -8,7 +8,6 @@ pymongo==4.6.1
 dnspython
 
 # ── Async ─────────────────────────────────
-asyncio
 aiohttp==3.9.3
 aiofiles
 
@@ -24,7 +23,6 @@ urllib3
 
 # ── Games / Logic ─────────────────────────
 python-dotenv==1.0.1
-apscheduler==3.10.4
 cachetools
 psutil
 # ── Utils ─────────────────────────────────

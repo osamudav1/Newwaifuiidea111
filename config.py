@@ -1,9 +1,14 @@
 import os
+
 from dotenv import load_dotenv
 
-# ── Load .env — absolute path so it works from ANY working directory ──────────
-_ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Simple.env")
-load_dotenv(_ENV_PATH)
+# Load the first available local env file. Linux filenames are case-sensitive,
+# so support both the historical `Simple.env` name and the committed template.
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+for _env_name in (".env", "Simple.env", "simple.env"):
+    _env_path = os.path.join(_BASE_DIR, _env_name)
+    if os.path.isfile(_env_path):
+        load_dotenv(_env_path, override=False)
 
 
 def _int(key: str, default: int = 0) -> int:
@@ -29,7 +34,10 @@ def _list(key: str) -> list[int]:
 
 
 def _str(key: str, default: str = "") -> str:
-    return os.getenv(key, default).strip()
+    value = os.getenv(key, default).strip()
+    # Ignore inline-comment placeholders from env templates such as
+    # `SUPPORT_CHAT= # https://t.me/example`.
+    return default if value.startswith("#") else value
 
 
 # ── Bot ───────────────────────────────────────────────────────────────────────
@@ -42,7 +50,9 @@ OWNER_ID        = _int("OWNER_ID")
 SUDO_USERS      = _list("SUDO_USERS")
 
 # ── Database ──────────────────────────────────────────────────────────────────
-MONGO_DB_URI    = _str("MONGO_DB_URI")
+# Render/deployment files may provide MONGO_URL; keep MONGO_DB_URI as the
+# canonical application name while accepting the deployment alias.
+MONGO_DB_URI    = _str("MONGO_DB_URI") or _str("MONGO_URL")
 
 # ── Channels & Chats ──────────────────────────────────────────────────────────
 LOG_CHANNEL     = _int("LOG_CHANNEL")

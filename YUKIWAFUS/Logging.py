@@ -1,5 +1,6 @@
 import logging
 import sys
+
 from colorlog import ColoredFormatter
 
 LOG_FORMAT = "%(log_color)s[%(asctime)s] [%(levelname)s]%(reset)s ❯ %(name)s ❯ %(message)s"

@@ -1,6 +1,6 @@
 import glob
 import os
-from os.path import basename, dirname, isfile, relpath
+from os.path import dirname, isfile, relpath
 
 from YUKIWAFUS.Logging import LOGGER
 
