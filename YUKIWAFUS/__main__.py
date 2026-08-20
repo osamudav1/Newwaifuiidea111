@@ -4,6 +4,8 @@ import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from pyrogram import idle
+
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -30,13 +32,25 @@ def start_health_server():
     return server
 
 
-from pyrogram import idle
+# Runtime objects are loaded only after the health server is bound.  This lets
+# Render detect the web port even when an environment value or Telegram/MongoDB
+# startup dependency is temporarily invalid.
+app = None
+config = None
+ALL_MODULES = ()
+_log = None
 
-import config
-from YUKIWAFUS import LOGGER, app
-from YUKIWAFUS.modules import ALL_MODULES
 
-_log = LOGGER
+def load_runtime():
+    global app, config, ALL_MODULES, _log
+    import config as config_module
+    from YUKIWAFUS import LOGGER, app as app_client
+    from YUKIWAFUS.modules import ALL_MODULES as discovered_modules
+
+    config = config_module
+    app = app_client
+    ALL_MODULES = discovered_modules
+    _log = LOGGER
 
 
 async def init():
@@ -96,6 +110,7 @@ async def init():
 
 if __name__ == "__main__":
     start_health_server()
+    load_runtime()
     # `Client` creates its dispatcher on the event loop available during
     # package import.  Reusing that same loop is required because Pyrogram's
     # decorator registration schedules handler-install tasks on it.  Using

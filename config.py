@@ -87,11 +87,11 @@ import re as _re
 
 def _check_url(value: str, name: str) -> None:
     if value and not _re.match(r"https?://", value):
-        raise SystemExit(
-            f"\n[ERROR] {name} URL invalid!\n"
-            f"  Got    : {value!r}\n"
-            f"  Fix    : Must start with https://\n"
-            f"  Example: https://t.me/yourchat\n"
+        # Do not terminate the bot before Render can detect /health. The
+        # affected feature can report its own configuration error at runtime.
+        print(
+            f"[WARNING] {name} URL is invalid: {value!r}; "
+            "expected a value beginning with https://"
         )
 
 _check_url(SUPPORT_CHAT,   "SUPPORT_CHAT")
