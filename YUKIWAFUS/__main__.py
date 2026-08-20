@@ -4,7 +4,6 @@ import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from pyrogram import idle
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -102,6 +101,8 @@ async def init():
             )
         except Exception:
             pass
+
+    from pyrogram import idle
 
     await idle()
     await app.stop()
