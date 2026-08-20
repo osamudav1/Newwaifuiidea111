@@ -103,6 +103,22 @@ def _photo(card: dict) -> str | None:
     return None
 
 
+_INVALID_MEDIA_MARKERS = (
+    "WEBPAGE_MEDIA_EMPTY",
+    "MEDIA_EMPTY",
+    "MEDIA_INVALID",
+    "PHOTO_INVALID",
+    "PHOTO_INVALID_DIMENSIONS",
+    "IMAGE_PROCESS_FAILED",
+    "WEBPAGE_CURL_FAILED",
+)
+
+
+def _is_invalid_media_error(exc: Exception) -> bool:
+    message = str(exc).upper()
+    return any(marker in message for marker in _INVALID_MEDIA_MARKERS)
+
+
 def _text(value: Any, default: str, limit: int = 250) -> str:
     value = default if value is None or str(value).strip() == "" else str(value).strip()
     return escape(value[:limit])
@@ -169,7 +185,7 @@ async def _fetch_page(skip: int) -> list | None:
     return None
 
 
-async def _send_photo_with_retry(client: Client, channel_id: int, card: dict, card_id: int) -> None:
+async def _send_photo_with_retry(client: Client, channel_id: int, card: dict, card_id: int) -> bool:
     delay = 3
     for attempt in range(SEND_RETRIES):
         try:
@@ -179,16 +195,20 @@ async def _send_photo_with_retry(client: Client, channel_id: int, card: dict, ca
                 caption=_caption(card, card_id),
                 parse_mode=enums.ParseMode.HTML,
             )
-            return
+            return True
         except FloodWait as exc:
             wait_for = max(int(getattr(exc, "value", 0) or 0) + 5, 5)
             LOGGER.warning("Backup FloodWait for %ss on card %s", wait_for, card_id)
             await asyncio.sleep(wait_for)
-        except Exception:
+        except Exception as exc:
+            if _is_invalid_media_error(exc):
+                LOGGER.warning("Skipping card %s because its media is invalid: %s", card_id, exc)
+                return False
             if attempt + 1 >= SEND_RETRIES:
                 raise
             await asyncio.sleep(delay)
             delay = min(delay * 2, 60)
+    raise RuntimeError(f"Unable to send card {card_id} after retries.")
 
 
 async def _mark_sent(card_id: int, last_id: int, api_skip: int) -> None:
@@ -198,6 +218,24 @@ async def _mark_sent(card_id: int, last_id: int, api_skip: int) -> None:
             "$set": {"last_id": last_id, "api_skip": api_skip, "running": True},
             "$addToSet": {"backed_up_ids": str(card_id)},
             "$inc": {"sent_count": 1},
+        },
+        upsert=True,
+    )
+
+
+async def _mark_skipped(card_id: int, last_id: int, api_skip: int, reason: str) -> None:
+    await backupdb.update_one(
+        {"_id": STATE_ID},
+        {
+            "$set": {
+                "last_id": last_id,
+                "api_skip": api_skip,
+                "running": True,
+                "last_skipped_id": card_id,
+                "last_skipped_reason": reason[:300],
+            },
+            "$addToSet": {"backed_up_ids": str(card_id)},
+            "$inc": {"skipped_count": 1},
         },
         upsert=True,
     )
@@ -260,7 +298,7 @@ async def _backup_worker(client: Client, start_id: int | None = None) -> None:
                     continue
 
                 try:
-                    await _send_photo_with_retry(client, channel_id, card, card_id)
+                    sent = await _send_photo_with_retry(client, channel_id, card, card_id)
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
@@ -271,6 +309,17 @@ async def _backup_worker(client: Client, start_id: int | None = None) -> None:
                         upsert=True,
                     )
                     return
+
+                if not sent:
+                    cursor = max(cursor, card_id)
+                    backed_up.add(str(card_id))
+                    await _mark_skipped(
+                        card_id,
+                        cursor,
+                        skip,
+                        "Telegram rejected the card image as invalid media.",
+                    )
+                    continue
 
                 cursor = max(cursor, card_id)
                 backed_up.add(str(card_id))
