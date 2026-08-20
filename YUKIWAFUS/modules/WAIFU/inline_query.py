@@ -1,4 +1,3 @@
-import time
 from html import escape
 
 from cachetools import TTLCache
@@ -63,13 +62,16 @@ def _build_collection_caption(waifu: dict, owner_name: str, count: int) -> str:
     rarity   = waifu.get("rarity", "Common")
     emoji    = RARITY_EMOJI.get(rarity, "◈")
     waifu_id = waifu.get("waifu_id", "N/A")
+    anime_name = waifu.get("anime_name", waifu.get("anime", "Unknown"))
+    event = waifu.get("event", waifu.get("event_tag", "Standard"))
     return (
         f"<blockquote>"
         f"<b>🌸 {escape(owner_name)}'s Collection</b>"
         f"</blockquote>\n\n"
         f"<b>📛 Name :</b> {escape(waifu.get('name', '?'))}\n"
+        f"<b>🎬 Anime :</b> {escape(anime_name)}\n"
         f"<b>{emoji} Rarity :</b> {rarity}\n"
-        f"<b>🏷 Tag :</b> {waifu.get('event_tag', 'Standard')}\n"
+        f"<b>🏷 Event :</b> {escape(event)}\n"
         f"<b>🆔 ID :</b> <code>{waifu_id}</code>\n"
         f"<b>✖ Count :</b> ×{count}"
     )
@@ -79,13 +81,16 @@ def _build_global_caption(waifu: dict) -> str:
     rarity   = waifu.get("rarity", "Common")
     emoji    = RARITY_EMOJI.get(rarity, "◈")
     waifu_id = waifu.get("waifu_id", "N/A")
+    anime_name = waifu.get("anime_name", waifu.get("anime", "Unknown"))
+    event = waifu.get("event", waifu.get("event_tag", "Standard"))
     return (
         f"<blockquote>"
         f"<b>🌸 Waifu Info</b>"
         f"</blockquote>\n\n"
         f"<b>📛 Name :</b> {escape(waifu.get('name', '?'))}\n"
+        f"<b>🎬 Anime :</b> {escape(anime_name)}\n"
         f"<b>{emoji} Rarity :</b> {rarity}\n"
-        f"<b>🏷 Tag :</b> {waifu.get('event_tag', 'Standard')}\n"
+        f"<b>🏷 Event :</b> {escape(event)}\n"
         f"<b>🆔 ID :</b> <code>{waifu_id}</code>"
     )
 
@@ -137,7 +142,8 @@ async def inline_handler(client: Client, query: InlineQuery):
                     w for w in all_waifus
                     if search_str in w.get("name", "").lower()
                     or search_str in w.get("rarity", "").lower()
-                    or search_str in w.get("event_tag", "").lower()
+                    or search_str in w.get("event", w.get("event_tag", "")).lower()
+                    or search_str in w.get("anime_name", w.get("anime", "")).lower()
                 ]
 
             unique, counts = _dedupe_count(all_waifus)
@@ -163,7 +169,7 @@ async def inline_handler(client: Client, query: InlineQuery):
                         caption=caption,
                         parse_mode=enums.ParseMode.HTML,
                         title=w.get("name", "?"),
-                        description=f"{w.get('rarity', '')} · ×{count}",
+                        description=f"{w.get('rarity', '')} · {w.get('anime_name', w.get('anime', 'Unknown'))} · ×{count}",
                     )
                 )
 
@@ -183,7 +189,7 @@ async def inline_handler(client: Client, query: InlineQuery):
                         caption=caption,
                         parse_mode=enums.ParseMode.HTML,
                         title=w.get("name", "?"),
-                        description=f"{RARITY_EMOJI.get(w.get('rarity',''), '◈')} {w.get('rarity', '')} · {w.get('event_tag', 'Standard')}",
+                        description=f"{RARITY_EMOJI.get(w.get('rarity',''), '◈')} {w.get('rarity', '')} · {w.get('anime_name', w.get('anime', 'Unknown'))}",
                     )
                 )
 

@@ -1,4 +1,3 @@
-import asyncio
 import time
 from html import escape
 
@@ -217,8 +216,9 @@ async def guess_handler(client: Client, message: Message):
                 f"<b>{mention} {sc('guessed correctly')}!</b>"
                 f"</blockquote>\n\n"
                 f"<b>📛 {sc('Name')} :</b> {escape(correct_name)}\n"
+                f"<b>🎬 {sc('Anime')} :</b> {escape(waifu.get('anime_name', waifu.get('anime', 'Unknown')))}\n"
                 f"<b>{emoji} {sc('Rarity')} :</b> {rarity}\n"
-                f"<b>🏷 {sc('Tag')} :</b> {waifu.get('event_tag', 'Standard')}\n"
+                f"<b>🏷 {sc('Event')} :</b> {waifu.get('event', waifu.get('event_tag', 'Standard'))}\n"
                 f"<b>🆔 {sc('ID')} :</b> <code>{waifu_id}</code>\n\n"
                 f"<b>🌸 +{COINS_REWARD} {sc('Sakura')} →</b> "
                 f"<b>{new_balance:,} 🌸</b>\n"

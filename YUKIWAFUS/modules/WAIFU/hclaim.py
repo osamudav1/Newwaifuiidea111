@@ -1,5 +1,4 @@
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from html import escape
 
 from pyrogram import Client, enums, filters
@@ -138,15 +137,16 @@ async def hclaim_handler(client: Client, message: Message):
                 f"<blockquote>🎊 <b>{sc('Daily Claim')}!</b></blockquote>\n\n"
                 f"🎉 {mention} {sc('got a new waifu')}!\n\n"
                 f"📛 <b>{sc('Name')}:</b> {escape(waifu['name'])}\n"
+                f"🎬 <b>{sc('Anime')}:</b> {escape(waifu.get('anime_name', waifu.get('anime', 'Unknown')))}\n"
                 f"{emoji} <b>{sc('Rarity')}:</b> {rarity}\n"
-                f"🏷 <b>{sc('Tag')}:</b> {waifu.get('event_tag', 'Standard')}\n\n"
+                f"🏷 <b>{sc('Event')}:</b> {waifu.get('event', waifu.get('event_tag', 'Standard'))}\n\n"
                 f"🪙 <b>+{CLAIM_COINS} {sc('coins')}</b> → {sc('Balance')}: <b>{new_balance}</b>\n\n"
                 f"<i>{sc('Come back tomorrow for another claim')}~</i>"
             ),
             reply_markup=keyboard,
         )
 
-    except Exception as e:
+    except Exception:
         await message.reply_text(f"❌ {sc('Something went wrong. Try again!')}")
 
     finally:
