@@ -241,6 +241,7 @@ async def save_waifu(
             photo=img_url,
             caption=(
                 f"✅ <b>Waifu Added!</b>\n\n"
+                f"🆔 <b>ID:</b> <code>{waifu_id}</code>\n"
                 f"📛 <b>Character:</b> {escape(name)}\n"
                 f"🎬 <b>Anime:</b> {escape(anime_name)}\n"
                 f"{emoji} <b>Rarity:</b> {rarity}\n"
