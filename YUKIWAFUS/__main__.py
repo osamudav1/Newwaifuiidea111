@@ -13,7 +13,7 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        body = b"YUKIWAFUS is running\n"
+        body = b"OK\n"
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
