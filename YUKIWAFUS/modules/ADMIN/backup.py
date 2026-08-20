@@ -21,8 +21,7 @@ OWNER_FILTER = filters.user(config.OWNER_ID)
 PAGE_SIZE = 50
 PAGE_RETRIES = 4
 SEND_RETRIES = 4
-PAUSE_AFTER_PHOTOS = 5
-PAUSE_SECONDS = 2
+PHOTO_DELAY_SECONDS = 1
 STATE_ID = "state"
 CHANNEL_KEY = "backup_channel"
 
@@ -247,7 +246,6 @@ async def _backup_worker(client: Client, start_id: int | None = None) -> None:
     cursor = int(state.get("last_id", 0) or 0)
     skip = int(state.get("api_skip", 0) or 0)
     backed_up = {str(item) for item in state.get("backed_up_ids", [])}
-    sent_since_pause = 0
 
     if start_id is not None:
         cursor = max(start_id - 1, 0)
@@ -323,12 +321,10 @@ async def _backup_worker(client: Client, start_id: int | None = None) -> None:
 
                 cursor = max(cursor, card_id)
                 backed_up.add(str(card_id))
-                sent_since_pause += 1
                 await _mark_sent(card_id, cursor, skip)
-                if sent_since_pause >= PAUSE_AFTER_PHOTOS:
-                    await asyncio.sleep(PAUSE_SECONDS)
-                    sent_since_pause = 0
-
+                # Keep one-second spacing between every successful photo.
+                await asyncio.sleep(PHOTO_DELAY_SECONDS)
+                
             skip += len(page)
             await _save_state(api_skip=skip, last_id=cursor, running=True)
     except asyncio.CancelledError:
