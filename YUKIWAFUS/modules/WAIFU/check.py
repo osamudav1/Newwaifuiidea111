@@ -111,14 +111,17 @@ async def _catcher_stats(raw_id: str, waifu: dict) -> tuple[int, list[tuple[str,
 
 def _check_caption(waifu: dict, raw_id: str, total: int, top_ten: list[tuple[str, int]]) -> str:
     name = waifu.get("name", waifu.get("character_name", "Unknown"))
-    anime = waifu.get("anime_name", waifu.get("anime", "Unknown Anime"))
+    anime = waifu.get("anime_name", waifu.get("anime", ""))
+    anime = str(anime).strip() if anime is not None else ""
+    if anime.lower() in {"unknown", "unknown anime", "none", "n/a", "-"}:
+        anime = ""
     rarity = waifu.get("rarity", "Common")
     event = waifu.get("event", waifu.get("event_tag", "Standard"))
     emoji = RARITY_EMOJI.get(rarity, "◈")
     lines = [
-        "◈ <b>OwO! Check out this character!</b> ◈",
+        "◈<b>OwO! Check out this character</b>◈",
         "",
-        f"🎬 <b>{escape(str(anime))}</b>",
+        f"🎬 <b>{escape(anime)}</b>" if anime else None,
         f"<code>{escape(str(raw_id))}</code>: <b>{escape(str(name))}</b> [{emoji}]",
         f"(🪞 <b>RARITY: {escape(str(rarity))}</b>)",
         "",
@@ -132,7 +135,7 @@ def _check_caption(waifu: dict, raw_id: str, total: int, top_ten: list[tuple[str
         lines.extend(f"➥ {escape(name)} x{count}" for name, count in top_ten)
     else:
         lines.append("➥ No one has caught this character yet.")
-    return "\n".join(lines)
+    return "\n".join(line for line in lines if line is not None)
 
 
 @app.on_message(filters.command("check"))
