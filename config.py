@@ -61,6 +61,9 @@ MONGO_DB_URI    = _str("MONGO_DB_URI") or _str("MONGO_URL")
 LOG_CHANNEL     = _int("LOG_CHANNEL")
 SUPPORT_CHAT    = _str("SUPPORT_CHAT")
 UPDATE_CHANNEL  = _str("UPDATE_CHANNEL")
+# Optional fallback only; the owner can configure the channel from DM with
+# /setbackupchannel, so this does not need to be present in Render env.
+BACKUP_CHANNEL  = _int("BACKUP_CHANNEL")
 
 # ── Waifu API ─────────────────────────────────────────────────────────────────
 WAIFU_API_URL   = _str("WAIFU_API_URL", "YUKI_027d60ef7a1041771d0791836260daf7")

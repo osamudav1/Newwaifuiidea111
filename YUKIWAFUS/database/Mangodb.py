@@ -53,6 +53,7 @@ auradb        = mongodb.auras           # purchased auras
 
 # Admin / Settings
 onoffdb       = mongodb.onoff
+backupdb      = mongodb.backup_state  # API card backup progress and deduplication
 langdb        = mongodb.language
 blacklistdb   = mongodb.blacklist_chats
 authdb        = mongodb.auth_users
