@@ -138,7 +138,7 @@ async def photo_add_handler(client: Client, message: Message):
     await _ask_name(message)
 
 
-@app.on_message(filters.text & ADMIN_FILTER & filters.private)
+@app.on_message(filters.text & filters.private)
 async def addwaifu_wizard_handler(client: Client, message: Message):
     key = _key(message)
     data = _PENDING.get(key)
@@ -176,7 +176,14 @@ async def addwaifu_wizard_handler(client: Client, message: Message):
 
     if data["step"] == "event":
         data.update(event=_event_value(text), step="confirm")
-        return await _show_confirmation(message, data)
+        try:
+            return await _show_confirmation(message, data)
+        except Exception as exc:
+            LOGGER.exception("/addwaifu confirmation failed: %s", exc)
+            data["step"] = "event"
+            return await message.reply_text(
+                "⚠️ I could not show the confirmation. Please send the event again, or send /cancel."
+            )
 
 
 @app.on_callback_query(filters.regex(r"^awf:(confirm|cancel):(\d+)$"))
