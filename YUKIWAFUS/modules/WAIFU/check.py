@@ -41,6 +41,29 @@ async def _find_waifu(raw_id: str) -> dict | None:
     except Exception as exc:
         LOGGER.warning("Local /check lookup failed: %s", exc)
 
+    # Check active spawn snapshots before querying user collections.
+    try:
+        from YUKIWAFUS.modules.WAIFU.spawn import active_spawns
+        for card in active_spawns.values():
+            if str(card.get("waifu_id", "")) in {str(value) for value in values}:
+                return card
+            if str(card.get("id", "")) in {str(value) for value in values}:
+                return card
+    except Exception as exc:
+        LOGGER.debug("Active spawn /check lookup skipped: %s", exc)
+
+    # A guessed card is stored in user collections. This fallback makes
+    # `/check` work even when the public API list is paginated or unavailable.
+    try:
+        async for user in collectiondb.find({"waifus": {"$exists": True}}):
+            for card in user.get("waifus", []):
+                if str(card.get("waifu_id", "")) in {str(value) for value in values}:
+                    return card
+                if str(card.get("id", "")) in {str(value) for value in values}:
+                    return card
+    except Exception as exc:
+        LOGGER.warning("Collection /check lookup failed: %s", exc)
+
     # Fallback for cards supplied by the public waifu API.
     try:
         cards = await get_waifu_list(skip=0, limit=1000) or []
