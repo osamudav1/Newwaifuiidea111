@@ -6,8 +6,13 @@ from YUKIWAFUS import app
 from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.database.Mangodb import onoffdb
 
-ADMIN_FILTER = filters.user(config.SUDO_USERS + [config.OWNER_ID])
 WELCOME_KEY = "welcome_photo"
+ADMIN_IDS = {int(user_id) for user_id in (config.SUDO_USERS + [config.OWNER_ID]) if int(user_id) > 0}
+
+
+def _is_admin(message: Message) -> bool:
+    user = message.from_user
+    return bool(user and user.id in ADMIN_IDS)
 
 
 async def _current_photo():
@@ -23,8 +28,11 @@ async def _current_photo():
     return None
 
 
-@app.on_message(filters.command(["setwelcome", "addwelcome"]) & ADMIN_FILTER)
+@app.on_message(filters.command(["setwelcome", "addwelcome", "setwelcomephoto", "welcomephoto"]))
 async def set_welcome_photo(client: Client, message: Message):
+    if not _is_admin(message):
+        return await message.reply_text("⛔ Only the owner or sudo users can change the welcome photo.")
+
     source = message.reply_to_message or message
     photo = getattr(source, "photo", None)
     if not photo:
@@ -50,8 +58,10 @@ async def set_welcome_photo(client: Client, message: Message):
         await message.reply_text("❌ Welcome photo သိမ်းမရပါ။ Database ကို စစ်ဆေးပါ။")
 
 
-@app.on_message(filters.command("delwelcome") & ADMIN_FILTER)
+@app.on_message(filters.command(["delwelcome", "deletewelcome", "removewelcome"]))
 async def delete_welcome_photo(client: Client, message: Message):
+    if not _is_admin(message):
+        return await message.reply_text("⛔ Only the owner or sudo users can change the welcome photo.")
     try:
         await onoffdb.update_one(
             {"key": WELCOME_KEY},
@@ -67,8 +77,10 @@ async def delete_welcome_photo(client: Client, message: Message):
         await message.reply_text("❌ Welcome photo ဖျက်မရပါ။ Database ကို စစ်ဆေးပါ။")
 
 
-@app.on_message(filters.command("resetwelcome") & ADMIN_FILTER)
+@app.on_message(filters.command(["resetwelcome", "defaultwelcome"]))
 async def reset_welcome_photo(client: Client, message: Message):
+    if not _is_admin(message):
+        return await message.reply_text("⛔ Only the owner or sudo users can change the welcome photo.")
     try:
         await onoffdb.delete_one({"key": WELCOME_KEY})
         await message.reply_text(
@@ -80,12 +92,14 @@ async def reset_welcome_photo(client: Client, message: Message):
         await message.reply_text("❌ Welcome photo reset မလုပ်နိုင်ပါ။ Database ကို စစ်ဆေးပါ။")
 
 
-@app.on_message(filters.command("welcome") & ADMIN_FILTER)
+@app.on_message(filters.command(["welcome", "welcomepreview"]))
 async def preview_welcome_photo(client: Client, message: Message):
+    if not _is_admin(message):
+        return await message.reply_text("⛔ Only the owner or sudo users can view the welcome photo.")
     photo = await _current_photo()
     if photo:
         return await message.reply_photo(photo=photo, caption="🖼 Current custom welcome photo")
     return await message.reply_text(
-        "ℹ️ Custom welcome photo မသတ်မှတ်ထားပါ။ <code>/start</code> မှာ text panel ပြပါမယ်။",
+        "ℹ️ Custom welcome photo မသတ်မှတ်ထားပါ။ <code>/start</code> မှာ config default photo သုံးပါမယ်။",
         parse_mode=enums.ParseMode.HTML,
     )
