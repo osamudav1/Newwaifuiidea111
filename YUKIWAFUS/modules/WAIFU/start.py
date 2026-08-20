@@ -41,7 +41,20 @@ START_REACTION_BIG   = getattr(config, "START_REACTION_BIG",   False)
 GROUP_REACTION_EMOJI = getattr(config, "GROUP_REACTION_EMOJI", "❤️")
 FIRE_EMOJI           = getattr(config, "FIRE_EMOJI",           "🔥")
 
-WAIFU_PICS = getattr(config, "WAIFU_PICS", ["https://files.catbox.moe/08ge3a.jpg"])
+async def _get_welcome_photo() -> str | None:
+    """Return admin override, disabled state, or configured default photo."""
+    try:
+        override = await onoffdb.find_one({"key": "welcome_photo"})
+        if override is not None:
+            value = str(override.get("value", "")).strip()
+            if value.lower() in {"", "disabled", "none", "off"}:
+                return None
+            return value
+    except Exception as exc:
+        LOGGER.warning("Welcome photo override unavailable: %s", exc)
+
+    configured = getattr(config, "WAIFU_PICS", [])
+    return random.choice(configured) if configured else None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -214,6 +227,30 @@ async def send_magic_start(
 ) -> int | None:
     if effect_id is None:
         effect_id = EFFECT_HEARTS
+
+    if not photo_url:
+        try:
+            rows = []
+            for row in raw_kb:
+                buttons = []
+                for button in row:
+                    if button.get("callback_data"):
+                        buttons.append(InlineKeyboardButton(button["text"], callback_data=button["callback_data"]))
+                    elif button.get("url"):
+                        buttons.append(InlineKeyboardButton(button["text"], url=button["url"]))
+                if buttons:
+                    rows.append(buttons)
+            msg = await app.send_message(
+                chat_id,
+                caption,
+                parse_mode=enums.ParseMode.HTML,
+                reply_to_message_id=reply_to_id,
+                reply_markup=InlineKeyboardMarkup(rows) if rows else None,
+            )
+            return msg.id
+        except Exception as exc:
+            LOGGER.warning("Welcome text fallback failed: %s", exc)
+            return None
 
     payload = {
         "chat_id":           chat_id,
@@ -397,7 +434,7 @@ async def start_private(client: Client, message: Message):
 
     sent_id = await send_magic_start(
         chat_id,
-        random.choice(WAIFU_PICS),
+        await _get_welcome_photo(),
         caption,
         _private_panel(bot_me.username),
         effect_id=EFFECT_HEARTS,
@@ -456,7 +493,7 @@ async def start_group(client: Client, message: Message):
 
     msg_id = await send_magic_start(
         chat_id,
-        random.choice(WAIFU_PICS),
+        await _get_welcome_photo(),
         caption,
         _group_panel(bot_me.username),
         reply_to_id=message.id,

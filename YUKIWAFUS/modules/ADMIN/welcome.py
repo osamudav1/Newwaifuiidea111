@@ -1,0 +1,91 @@
+from pyrogram import Client, enums, filters
+from pyrogram.types import Message
+
+import config
+from YUKIWAFUS import app
+from YUKIWAFUS.Logging import LOGGER
+from YUKIWAFUS.database.Mangodb import onoffdb
+
+ADMIN_FILTER = filters.user(config.SUDO_USERS + [config.OWNER_ID])
+WELCOME_KEY = "welcome_photo"
+
+
+async def _current_photo():
+    try:
+        override = await onoffdb.find_one({"key": WELCOME_KEY})
+        if override is not None:
+            value = str(override.get("value", "")).strip()
+            if value.lower() in {"", "disabled", "none", "off"}:
+                return None
+            return value
+    except Exception as exc:
+        LOGGER.exception("Welcome photo lookup failed: %s", exc)
+    return None
+
+
+@app.on_message(filters.command(["setwelcome", "addwelcome"]) & ADMIN_FILTER)
+async def set_welcome_photo(client: Client, message: Message):
+    source = message.reply_to_message or message
+    photo = getattr(source, "photo", None)
+    if not photo:
+        return await message.reply_text(
+            "📷 Photo တစ်ပုံကို reply လုပ်ပြီး "
+            "<code>/setwelcome</code> ပို့ပါ။\n\n"
+            "အသုံးပြုပုံ: photo ကို reply → /setwelcome",
+            parse_mode=enums.ParseMode.HTML,
+        )
+
+    try:
+        await onoffdb.update_one(
+            {"key": WELCOME_KEY},
+            {"$set": {"value": photo.file_id, "updated_by": message.from_user.id}},
+            upsert=True,
+        )
+        await message.reply_text(
+            "✅ Welcome photo အသစ်ကို သိမ်းပြီးပါပြီ။ နောက်တစ်ကြိမ် <code>/start</code> မှာ အသစ်ကို သုံးပါမယ်။",
+            parse_mode=enums.ParseMode.HTML,
+        )
+    except Exception as exc:
+        LOGGER.exception("Welcome photo save failed: %s", exc)
+        await message.reply_text("❌ Welcome photo သိမ်းမရပါ။ Database ကို စစ်ဆေးပါ။")
+
+
+@app.on_message(filters.command("delwelcome") & ADMIN_FILTER)
+async def delete_welcome_photo(client: Client, message: Message):
+    try:
+        await onoffdb.update_one(
+            {"key": WELCOME_KEY},
+            {"$set": {"value": "disabled", "updated_by": message.from_user.id}},
+            upsert=True,
+        )
+        await message.reply_text(
+            "🗑 Welcome photo ကို ဖျက်ထားပါပြီ။ <code>/start</code> မှာ photo မပါဘဲ text panel ပြပါမယ်။",
+            parse_mode=enums.ParseMode.HTML,
+        )
+    except Exception as exc:
+        LOGGER.exception("Welcome photo delete failed: %s", exc)
+        await message.reply_text("❌ Welcome photo ဖျက်မရပါ။ Database ကို စစ်ဆေးပါ။")
+
+
+@app.on_message(filters.command("resetwelcome") & ADMIN_FILTER)
+async def reset_welcome_photo(client: Client, message: Message):
+    try:
+        await onoffdb.delete_one({"key": WELCOME_KEY})
+        await message.reply_text(
+            "♻️ Welcome photo ကို default config photo သို့ reset လုပ်ပြီးပါပြီ။",
+            parse_mode=enums.ParseMode.HTML,
+        )
+    except Exception as exc:
+        LOGGER.exception("Welcome photo reset failed: %s", exc)
+        await message.reply_text("❌ Welcome photo reset မလုပ်နိုင်ပါ။ Database ကို စစ်ဆေးပါ။")
+
+
+@app.on_message(filters.command("welcome") & ADMIN_FILTER)
+async def preview_welcome_photo(client: Client, message: Message):
+    photo = await _current_photo()
+    if photo:
+        return await message.reply_photo(photo=photo, caption="🖼 Current custom welcome photo")
+    return await message.reply_text(
+        "ℹ️ Custom welcome photo မသတ်မှတ်ထားပါ။ <code>/start</code> မှာ text panel ပြပါမယ်။",
+        parse_mode=enums.ParseMode.HTML,
+    )

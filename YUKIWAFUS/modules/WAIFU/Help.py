@@ -1,6 +1,4 @@
 import aiohttp
-from typing import Union
-
 from pyrogram import Client, enums, filters
 from pyrogram.types import (
     CallbackQuery,
@@ -179,7 +177,9 @@ _HELP = {
         "┌─── ˹ <b>ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs</b> ˼ ───●\n\n"
         "<blockquote>"
         "<emoji id='6294023338176028117'>🌸</emoji> "
-        "<b>/addwaifu</b> — <code>ᴀᴅᴅ ᴡᴀɪғᴜ ᴛᴏ ᴅᴀᴛᴀʙᴀsᴇ</code>\n"
+        "<b>/addwaifu</b> — <code>ᴘʜᴏᴛᴏ → ɴᴀᴍᴇ → ʀᴀʀɪᴛʏ → ᴛᴀɢ → ᴄᴏɴғɪʀᴍ</code>\n"
+        "<emoji id='6291835288569917326'>🖼</emoji> "
+        "<b>/setwelcome</b> / <b>/delwelcome</b> / <b>/resetwelcome</b> — <code>ᴍᴀɴᴀɢᴇ ᴡᴇʟᴄᴏᴍᴇ ᴘʜᴏᴛᴏ</code>\n"
         "<emoji id='5262770659267735289'>👑</emoji> "
         "<b>/addsudo</b> / <b>/rmsudo</b> — <code>ᴍᴀɴᴀɢᴇ sᴜᴅᴏ ᴜsᴇʀs</code>\n"
         "<emoji id='6294063539069917326'>📢</emoji> "
