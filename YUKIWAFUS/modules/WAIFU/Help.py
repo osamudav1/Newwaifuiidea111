@@ -95,7 +95,9 @@ _HELP = {
         "<emoji id='6294023338176028117'>🔧</emoji> "
         "<b>/setspawn</b> <code>&lt;n&gt;</code> — <code>sᴘᴀᴡɴ ᴇᴠᴇʀʏ ɴ ᴍᴇssᴀɢᴇs</code>\n"
         "<emoji id='6294063539069917326'>🔍</emoji> "
-        "<b>/search</b> — <code>sᴇᴀʀᴄʜ ᴡᴀɪғᴜs ɪɴ ᴅᴀᴛᴀʙᴀsᴇ</code>"
+        "<b>/search</b> — <code>sᴇᴀʀᴄʜ ᴡᴀɪғᴜs ɪɴ ᴅᴀᴛᴀʙᴀsᴇ</code>\n"
+        "<emoji id='5249244862359812334'>🧾</emoji> "
+        "<b>/check</b> <code>&lt;id&gt;</code> — <code>ᴄʜᴀʀᴀᴄᴛᴇʀ + ᴛᴏᴘ 𝟷𝟶 ᴄᴀᴛᴄʜᴇʀs</code>"
         "</blockquote>"
     ),
 

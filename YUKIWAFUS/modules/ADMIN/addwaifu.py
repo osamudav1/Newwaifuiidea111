@@ -48,6 +48,14 @@ def _event_value(value: str) -> str:
     return "Standard" if value.strip().lower() in {"", "-", "skip", "none"} else value.strip()[:100]
 
 
+async def _next_waifu_id() -> int:
+    latest = await waifudb.find_one(
+        {"waifu_id": {"$type": "number"}},
+        sort=[("waifu_id", -1)],
+    )
+    return int((latest or {}).get("waifu_id", 0)) + 1
+
+
 def build_log_caption(name, anime_name, rarity, event, img_url, added_by_name, added_by_id):
     emoji = RARITY_EMOJI.get(rarity, "◈")
     now = datetime.utcnow().strftime("%d %b %Y • %H:%M UTC")
@@ -212,7 +220,9 @@ async def save_waifu(
 
     processing = await target.reply_text("⏳ Saving waifu to database...")
     try:
+        waifu_id = await _next_waifu_id()
         doc = {
+            "waifu_id": waifu_id,
             "name": name,
             "character_name": name,
             "anime_name": anime_name,
