@@ -1,6 +1,8 @@
 import asyncio
+import re
 from html import escape
 from typing import Any
+from urllib.parse import urlparse
 
 from pyrogram import Client, enums, filters
 from pyrogram.errors import FloodWait
@@ -49,13 +51,36 @@ async def _save_state(**values: Any) -> None:
         )
 
 
-async def _get_backup_channel() -> int:
+def _normalize_channel_ref(raw: str) -> int | str | None:
+    value = (raw or "").strip()
+    if not value:
+        return None
+    if value.startswith("https://") or value.startswith("http://"):
+        parsed = urlparse(value)
+        path = parsed.path.strip("/")
+        # A private Telegram channel link such as t.me/c/1735522859/486
+        # maps to the Telegram peer ID -1001735522859.
+        match = re.fullmatch(r"c/(\d+)(?:/\d+)?", path)
+        if match:
+            return int(f"-100{match.group(1)}")
+        if path and re.fullmatch(r"[A-Za-z0-9_]{5,}", path):
+            return f"@{path}"
+        return None
+    if value.lstrip("-").isdigit():
+        return int(value)
+    if value.startswith("@"):
+        return value
+    if re.fullmatch(r"[A-Za-z0-9_]{5,}", value):
+        return f"@{value}"
+    return None
+
+
+async def _get_backup_channel() -> int | str:
     saved = await onoffdb.find_one({"key": CHANNEL_KEY})
     if saved and saved.get("value"):
-        try:
-            return int(saved["value"])
-        except (TypeError, ValueError):
-            pass
+        saved_ref = _normalize_channel_ref(str(saved["value"]))
+        if saved_ref is not None:
+            return saved_ref
     return int(getattr(config, "BACKUP_CHANNEL", 0) or 0)
 
 
@@ -101,24 +126,35 @@ def _status_name(status: Any) -> str:
     return str(getattr(status, "value", status)).lower()
 
 
-async def _validate_channel(client: Client, channel_id: int) -> tuple[bool, str]:
+async def _validate_channel(client: Client, channel_ref: int | str) -> tuple[bool, str, int | None]:
     try:
-        chat = await client.get_chat(channel_id)
-        if getattr(chat, "type", None) not in {enums.ChatType.CHANNEL, enums.ChatType.SUPERGROUP}:
-            return False, "Please send a channel or supergroup ID."
+        chat = await client.get_chat(channel_ref)
+        chat_type = _status_name(getattr(chat, "type", ""))
+        if chat_type not in {"channel", "supergroup"}:
+            return False, "Please send a channel or supergroup ID/username.", None
 
+        resolved_id = int(chat.id)
         me = await client.get_me()
-        member = await client.get_chat_member(channel_id, me.id)
+        member = await client.get_chat_member(resolved_id, me.id)
         status = _status_name(member.status)
         if "administrator" not in status and "owner" not in status:
-            return False, "The bot must be an administrator in that channel."
-        return True, getattr(chat, "title", str(channel_id))
+            return False, "The bot must be an administrator in that channel.", None
+
+        privileges = getattr(member, "privileges", None)
+        if "administrator" in status and privileges is not None:
+            can_post = getattr(privileges, "can_post_messages", True)
+            can_send = getattr(privileges, "can_send_messages", True)
+            if can_post is False and can_send is False:
+                return False, "The bot is admin but does not have permission to post messages.", None
+        return True, getattr(chat, "title", str(resolved_id)), resolved_id
     except Exception as exc:
-        LOGGER.warning("Backup channel validation failed for %s: %s", channel_id, exc)
+        error_name = type(exc).__name__
+        LOGGER.warning("Backup channel validation failed for %s (%s): %s", channel_ref, error_name, exc)
         return False, (
-            "I cannot access that chat. Check the channel ID and add this bot as an "
-            "administrator with permission to post messages."
-        )
+            "I cannot access that chat. Check the channel ID/username, ensure this exact bot "
+            "is added as an administrator, and allow it to post messages "
+            f"(Telegram error: {error_name})."
+        ), None
 
 
 async def _fetch_page(skip: int) -> list | None:
@@ -263,7 +299,7 @@ async def _start_backup(client: Client, message: Message, start_id: int | None) 
             "<code>/setbackupchannel -100xxxxxxxxxx</code>",
             parse_mode=enums.ParseMode.HTML,
         )
-    valid, detail = await _validate_channel(client, channel_id)
+    valid, detail, _ = await _validate_channel(client, channel_id)
     if not valid:
         return await message.reply_text(f"❌ Backup channel is not ready: {detail}")
     if _backup_task and not _backup_task.done():
@@ -279,25 +315,28 @@ async def _start_backup(client: Client, message: Message, start_id: int | None) 
 async def set_backup_channel_handler(client: Client, message: Message):
     if len(message.command) < 2:
         return await message.reply_text(
-            "📡 Send the channel ID in this format:\n<code>/setbackupchannel -100xxxxxxxxxx</code>",
+            "📡 Send a channel ID, public username, or Telegram link:\n"
+            "<code>/setbackupchannel -100xxxxxxxxxx</code>",
             parse_mode=enums.ParseMode.HTML,
         )
-    try:
-        channel_id = int(message.command[1])
-    except ValueError:
-        return await message.reply_text("❌ Channel ID must be a number, for example -1001234567890.")
+    channel_ref = _normalize_channel_ref(message.command[1])
+    if channel_ref is None:
+        return await message.reply_text(
+            "❌ Invalid channel reference. Use a numeric ID, @public_username, "
+            "or a Telegram channel link."
+        )
 
-    valid, detail = await _validate_channel(client, channel_id)
-    if not valid:
+    valid, detail, resolved_id = await _validate_channel(client, channel_ref)
+    if not valid or resolved_id is None:
         return await message.reply_text(f"❌ {detail}")
     await onoffdb.update_one(
         {"key": CHANNEL_KEY},
-        {"$set": {"key": CHANNEL_KEY, "value": channel_id, "owner_id": config.OWNER_ID}},
+        {"$set": {"key": CHANNEL_KEY, "value": resolved_id, "owner_id": config.OWNER_ID}},
         upsert=True,
     )
     await message.reply_text(
         f"✅ Backup channel connected: <b>{escape(str(detail))}</b>\n"
-        f"<code>{channel_id}</code>\n\n"
+        f"<code>{resolved_id}</code>\n\n"
         "The bot will send each card with its image and information caption.",
         parse_mode=enums.ParseMode.HTML,
     )
