@@ -17,6 +17,8 @@ from YUKIWAFUS import app
 from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.database.Mangodb import waifudb
 
+# These are only display suggestions. Rarity input is intentionally open-ended
+# because the upstream card API also contains values outside the six base tiers.
 RARITY_EMOJI = {
     "Common": "⚪",
     "Uncommon": "🟢",
@@ -24,8 +26,25 @@ RARITY_EMOJI = {
     "Epic": "🟣",
     "Legendary": "🟡",
     "Mythic": "🔴",
+    "Special Edition": "✨",
+    "Limited Edition": "💎",
+    "Anniversary": "🎉",
+    "1-star": "⭐",
+    "2-star": "⭐⭐",
+    "3-star": "⭐⭐⭐",
+    "4-star": "⭐⭐⭐⭐",
+    "5-star": "⭐⭐⭐⭐⭐",
 }
 VALID_RARITIES = tuple(RARITY_EMOJI)
+MAX_RARITY_LENGTH = 80
+
+
+def _rarity_emoji(value: str) -> str:
+    normalized = " ".join(str(value or "").split()).casefold()
+    for rarity, emoji in RARITY_EMOJI.items():
+        if rarity.casefold() == normalized:
+            return emoji
+    return "◈"
 ADMIN_FILTER = filters.user(config.SUDO_USERS + [config.OWNER_ID])
 _PENDING: dict[tuple[int, int], dict] = {}
 SESSION_TTL = 900
@@ -40,8 +59,15 @@ def _clean_text(message: Message) -> str:
 
 
 def _normal_rarity(value: str) -> str | None:
-    compact = re.sub(r"\s+", "", value).lower()
-    return next((rarity for rarity in VALID_RARITIES if rarity.lower() == compact), None)
+    """Clean a rarity while preserving custom/API values."""
+    cleaned = " ".join(str(value or "").split()).strip()
+    if not cleaned or len(cleaned) > MAX_RARITY_LENGTH:
+        return None
+    compact = re.sub(r"\s+", "", cleaned).casefold()
+    return next(
+        (rarity for rarity in VALID_RARITIES if re.sub(r"\s+", "", rarity).casefold() == compact),
+        cleaned,
+    )
 
 
 def _event_value(value: str) -> str:
@@ -57,14 +83,14 @@ async def _next_waifu_id() -> int:
 
 
 def build_log_caption(name, anime_name, rarity, event, img_url, added_by_name, added_by_id, video=None):
-    emoji = RARITY_EMOJI.get(rarity, "◈")
+    emoji = _rarity_emoji(rarity)
     now = datetime.utcnow().strftime("%d %b %Y • %H:%M UTC")
     media_line = "🎞️ <b>AMV:</b> Attached" if video else f"🖼 <b>Image:</b> <a href='{escape(str(img_url))}'>View</a>"
     return (
         "<blockquote>🌸 <b>New Waifu Added!</b></blockquote>\n\n"
         f"📛 <b>Character:</b> {escape(name)}\n"
         f"🎬 <b>Anime:</b> {escape(anime_name)}\n"
-        f"{emoji} <b>Rarity:</b> {rarity}\n"
+        f"{emoji} <b>Rarity:</b> {escape(str(rarity))}\n"
         f"🏷 <b>Event:</b> {escape(event)}\n"
         f"{media_line}\n\n"
         f"<blockquote>👤 <b>Added by:</b> <a href='tg://user?id={added_by_id}'>{escape(added_by_name)}</a>\n"
@@ -93,7 +119,9 @@ async def _ask_anime(message: Message):
 async def _ask_rarity(message: Message):
     await message.reply_text(
         "🌟 <b>Step 3/4 — Rarity</b>\n\n"
-        f"Choose one: <code>{', '.join(VALID_RARITIES)}</code>",
+        "Send the rarity exactly as it appears on the card/API.\n"
+        "Examples: <code>Mythic</code>, <code>Special Edition</code>, <code>1-star</code>\n"
+        f"Suggested values: <code>{', '.join(VALID_RARITIES)}</code>",
         parse_mode=enums.ParseMode.HTML,
         reply_markup=ForceReply(selective=True),
     )
@@ -118,7 +146,7 @@ async def _show_confirmation(message: Message, data: dict):
         "<blockquote>📋 <b>Check waifu details</b></blockquote>\n\n"
         f"📛 <b>Character:</b> {escape(data['name'])}\n"
         f"🎬 <b>Anime:</b> {escape(data['anime_name'])}\n"
-        f"🌟 <b>Rarity:</b> {data['rarity']}\n"
+        f"🌟 <b>Rarity:</b> {escape(str(data['rarity']))}\n"
         f"🏷 <b>Event:</b> {escape(data['event'])}\n"
         f"{'🎞️ <b>Media:</b> AMV video' if data.get('video') else '🖼 <b>Media:</b> Photo'}\n\n"
         "Press <b>Confirm</b> to save or <b>Cancel</b> to discard.",
@@ -185,7 +213,10 @@ async def addwaifu_wizard_handler(client: Client, message: Message):
     if data["step"] == "rarity":
         rarity = _normal_rarity(text)
         if not rarity:
-            return await message.reply_text(f"❌ Invalid rarity. Choose one: {', '.join(VALID_RARITIES)}")
+            return await message.reply_text(
+                f"❌ Rarity cannot be empty or longer than {MAX_RARITY_LENGTH} characters. "
+                "Examples: Special Edition, 1-star, or any API rarity."
+            )
         data.update(rarity=rarity, step="event")
         return await _ask_event(message)
 
@@ -260,14 +291,14 @@ async def save_waifu(
             doc["video"] = video
         await waifudb.insert_one(doc)
         await processing.delete()
-        emoji = RARITY_EMOJI.get(rarity, "◈")
+        emoji = _rarity_emoji(rarity)
         media_marker = " [🎞️]" if video else ""
         result_caption = (
             f"✅ <b>Waifu Added!</b>\n\n"
             f"🆔 <b>ID:</b> <code>{waifu_id}</code>\n"
             f"📛 <b>Character:</b> {escape(name)}{media_marker}\n"
             f"🎬 <b>Anime:</b> {escape(anime_name)}\n"
-            f"{emoji} <b>Rarity:</b> {rarity}\n"
+            f"{emoji} <b>Rarity:</b> {escape(str(rarity))}\n"
             f"🏷 <b>Event:</b> {escape(event)}"
         )
         if video:
@@ -330,7 +361,9 @@ async def addwaifu_cmd_handler(client: Client, message: Message):
         anime_name, rarity_text, event = "Unknown", parts[2], parts[3] if len(parts) > 3 else "Standard"
     rarity = _normal_rarity(rarity_text)
     if not rarity:
-        return await message.reply_text(f"❌ Invalid rarity. Valid: {', '.join(VALID_RARITIES)}")
+        return await message.reply_text(
+            f"❌ Rarity cannot be empty or longer than {MAX_RARITY_LENGTH} characters."
+        )
     await save_waifu(client, message, name, anime_name, img_url, rarity, _event_value(event))
 
 
@@ -348,7 +381,9 @@ async def auto_addwaifu_handler(client: Client, message: Message):
         event = parts[3] if len(parts) > 3 else "Standard"
     rarity = _normal_rarity(rarity_text)
     if not rarity:
-        return await message.reply_text(f"❌ Invalid rarity. Valid: {', '.join(VALID_RARITIES)}")
+        return await message.reply_text(
+            f"❌ Rarity cannot be empty or longer than {MAX_RARITY_LENGTH} characters."
+        )
     await save_waifu(
         client, message, name, anime_name,
         message.photo.file_id if message.photo else None,

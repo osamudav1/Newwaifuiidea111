@@ -11,6 +11,7 @@ from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.database.Mangodb import waifudb
 from YUKIWAFUS.utils.api import get_waifu_list, update_waifu
 
+# These are suggestions only. The API may contain additional/custom rarities.
 RARITY_EMOJI = {
     "Common": "⚪",
     "Uncommon": "🟢",
@@ -18,8 +19,25 @@ RARITY_EMOJI = {
     "Epic": "🟣",
     "Legendary": "🟡",
     "Mythic": "🔴",
+    "Special Edition": "✨",
+    "Limited Edition": "💎",
+    "Anniversary": "🎉",
+    "1-star": "⭐",
+    "2-star": "⭐⭐",
+    "3-star": "⭐⭐⭐",
+    "4-star": "⭐⭐⭐⭐",
+    "5-star": "⭐⭐⭐⭐⭐",
 }
 VALID_RARITIES = tuple(RARITY_EMOJI)
+MAX_RARITY_LENGTH = 80
+
+
+def _rarity_emoji(value: str) -> str:
+    normalized = " ".join(str(value or "").split()).casefold()
+    for rarity, emoji in RARITY_EMOJI.items():
+        if rarity.casefold() == normalized:
+            return emoji
+    return "◈"
 OWNER_FILTER = filters.user(config.OWNER_ID)
 _PENDING: dict[tuple[int, int], dict] = {}
 SESSION_TTL = 900
@@ -34,8 +52,15 @@ def _is_skip(value: str) -> bool:
 
 
 def _normal_rarity(value: str) -> str | None:
-    compact = re.sub(r"\s+", "", value).lower()
-    return next((item for item in VALID_RARITIES if item.lower() == compact), None)
+    """Clean a rarity while preserving custom/API values."""
+    cleaned = " ".join(str(value or "").split()).strip()
+    if not cleaned or len(cleaned) > MAX_RARITY_LENGTH:
+        return None
+    compact = re.sub(r"\s+", "", cleaned).casefold()
+    return next(
+        (item for item in VALID_RARITIES if re.sub(r"\s+", "", item).casefold() == compact),
+        cleaned,
+    )
 
 
 def _character(card: dict) -> str:
@@ -101,7 +126,11 @@ async def _ask_step(message: Message, data: dict) -> None:
         current = _character(card)
     elif step == "rarity":
         prompt = "🌟 <b>Step 3/5 — Rarity</b>"
-        details = f"Choose one: <code>{', '.join(VALID_RARITIES)}</code>"
+        details = (
+            "Send the rarity exactly as it appears on the card/API. "
+            "Examples: <code>Mythic</code>, <code>Special Edition</code>, <code>1-star</code>. "
+            f"Suggested values: <code>{', '.join(VALID_RARITIES)}</code>"
+        )
         current = _rarity(card)
     elif step == "anime_name":
         prompt = "🎬 <b>Step 4/5 — Anime name</b>"
@@ -181,7 +210,7 @@ async def _save_edit(message: Message, data: dict) -> None:
     card = dict(data["original"])
     card.update(updates)
     _PENDING.pop(session_key, None)
-    emoji = RARITY_EMOJI.get(_rarity(card), "◈")
+    emoji = _rarity_emoji(_rarity(card))
     caption = (
         "✅ <b>Card replaced successfully!</b>\n\n"
         f"🆔 <b>ID:</b> <code>{data['card_id']}</code>\n"
@@ -333,7 +362,10 @@ async def edit_wizard_handler(client: Client, message: Message):
     if step == "rarity":
         rarity = _normal_rarity(text)
         if not rarity:
-            return await message.reply_text(f"❌ Invalid rarity. Choose one: {', '.join(VALID_RARITIES)}")
+            return await message.reply_text(
+                f"❌ Rarity cannot be empty or longer than {MAX_RARITY_LENGTH} characters. "
+                "Examples: Special Edition, 1-star, or any API rarity."
+            )
         return await _advance(message, data, rarity)
     if step == "anime_name":
         if not 1 <= len(text) <= 150:
