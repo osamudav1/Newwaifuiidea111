@@ -122,7 +122,7 @@ def _check_caption(waifu: dict, raw_id: str, total: int, top_ten: list[tuple[str
         "◈<b>OwO! Check out this character</b>◈",
         "",
         f"🎬 <b>{escape(anime)}</b>" if anime else None,
-        f"<code>{escape(str(raw_id))}</code>: <b>{escape(str(name))}</b> [{emoji}]",
+        f"<code>{escape(str(raw_id))}</code>: <b>{escape(str(name))}</b>",
         f"(🪞 <b>RARITY: {escape(str(rarity))}</b>)",
         "",
         f"{emoji} <b>{escape(str(event))}</b> {emoji}",

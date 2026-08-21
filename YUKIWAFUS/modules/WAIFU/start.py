@@ -138,7 +138,7 @@ def _row(*buttons) -> list:
     return [b for b in buttons if b is not None]
 
 
-def _private_panel(bot_username: str = "") -> list:
+def _private_panel(bot_username: str = "", *, show_help: bool = False) -> list:
     # The caller already awaited get_me(); do not call the async method
     # synchronously here, otherwise the URL button silently disappears.
     bot_username = (bot_username or "").lstrip("@")
@@ -160,12 +160,16 @@ def _private_panel(bot_username: str = "") -> list:
     if row2:
         rows.append(row2)
 
-    rows.append(_row(
-        btn("˹ 𝐌ʏ ʜᴀʀᴇᴍ ˼",
-            callback_data="my_harem_inline", style="primary", emoji_id="5249244862359812334"),
-        btn("˹ ʜᴇʟᴘ ˼",
-            callback_data="waifu_help", style="primary", emoji_id="5238162283368035495"),
-    ))
+    home_buttons = [btn(
+        "˹ 𝐌ʏ ʜᴀʀᴇᴍ ˼",
+        callback_data="my_harem_inline", style="primary", emoji_id="5249244862359812334",
+    )]
+    if show_help:
+        home_buttons.append(btn(
+            "˹ ʜᴇʟᴘ ˼",
+            callback_data="waifu_help", style="primary", emoji_id="5238162283368035495",
+        ))
+    rows.append(_row(*home_buttons))
 
     return rows
 
@@ -436,7 +440,7 @@ async def start_private(client: Client, message: Message):
         chat_id,
         await _get_welcome_photo(),
         caption,
-        _private_panel(bot_me.username),
+        _private_panel(bot_me.username, show_help=user.id == config.OWNER_ID),
         effect_id=EFFECT_HEARTS,
     )
 
@@ -600,7 +604,9 @@ async def back_to_home_cb(client, cq):
         "message_id":   cq.message.id,
         "caption":      caption,
         "parse_mode":   "HTML",
-        "reply_markup": {"inline_keyboard": _private_panel(bot_me.username)},
+        "reply_markup": {"inline_keyboard": _private_panel(
+            bot_me.username, show_help=user.id == config.OWNER_ID
+        )},
     })
 
     if not ok.get("ok"):

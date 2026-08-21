@@ -1,4 +1,5 @@
 import aiohttp
+
 from pyrogram import Client, enums, filters
 from pyrogram.types import (
     CallbackQuery,
@@ -380,7 +381,14 @@ async def help_group_cmd(client: Client, message: Message):
 # ✅ "˹ ʜᴇʟᴘ ˼" BUTTON from start.py → opens help panel (edit caption)
 # ══════════════════════════════════════════════════════════════════════════════
 @app.on_callback_query(filters.regex("^waifu_help$"))
-async def help_main_cb(client: Client, cq: CallbackQuery):
+async def help_main_cb(client, cq):
+    if cq.from_user.id != config.OWNER_ID:
+        try:
+            await cq.answer("Help menu is available to the owner only.", show_alert=True)
+        except Exception:
+            pass
+        return
+
     try:
         await cq.answer("🌸 Help Menu", show_alert=False)
     except Exception:
