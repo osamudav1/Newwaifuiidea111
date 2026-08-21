@@ -43,6 +43,7 @@ giftdb        = mongodb.gifts
 
 # Games
 gamesdb       = mongodb.games           # game state per chat
+chat_guessdb  = mongodb.chat_guess_stats # per-chat guess counts by user
 game_statsdb  = mongodb.game_stats      # points, unlocks per user
 leaderdb      = mongodb.leaderboard
 

@@ -34,20 +34,23 @@ def uptime_str() -> str:
 async def stats_handler(client: Client, message: Message):
     processing = await message.reply_text(f"⏳ {sc('Fetching stats...')}")
 
-    # Gather all counts concurrently
-    (
-        total_users,
-        total_groups,
-        total_collectors,
-        api_stats,
-        sudo_data,
-    ) = await asyncio.gather(
+    # Gather all counts concurrently.  A failed optional count must not make
+    # the whole owner command disappear without a reply.
+    values = await asyncio.gather(
         usersdb.count_documents({}),
         chatsdb.count_documents({"chat_id": {"$lt": 0}}),
         collectiondb.count_documents({}),
         get_stats(),
         sudoersdb.find_one({"sudo": "sudo"}),
+        return_exceptions=True,
     )
+    total_users, total_groups, total_collectors, api_stats, sudo_data = values
+
+    total_users = 0 if isinstance(total_users, Exception) else total_users
+    total_groups = 0 if isinstance(total_groups, Exception) else total_groups
+    total_collectors = 0 if isinstance(total_collectors, Exception) else total_collectors
+    api_stats = None if isinstance(api_stats, Exception) else api_stats
+    sudo_data = None if isinstance(sudo_data, Exception) else sudo_data
 
     total_waifus   = (api_stats or {}).get("total", "N/A")
     total_sudoers  = len((sudo_data or {}).get("sudoers", []))

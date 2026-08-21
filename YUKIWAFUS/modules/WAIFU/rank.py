@@ -15,6 +15,7 @@ from YUKIWAFUS.database.Mangodb import (
     collectiondb,
     chatsdb,
     game_statsdb,
+    chat_guessdb,
 )
 from YUKIWAFUS.utils.helpers import sc
 
@@ -198,18 +199,29 @@ async def rank_cmd(client: Client, message: Message):
         parse_mode=enums.ParseMode.HTML,
     )
 
-    text     = await _fetch_waifus()
+    try:
+        text = await _fetch_waifus()
+    except Exception:
+        await loading.edit_text("❌ Leaderboard data is temporarily unavailable.")
+        return
     keyboard = _build_keyboard(TAB_WAIFUS)
 
     await loading.delete()
 
-    await message.reply_photo(
-        photo        = config.WAIFU_PICS[0],
-        caption      = text,
-        parse_mode   = enums.ParseMode.HTML,
-        reply_markup = keyboard,
-        has_spoiler  = True,
-    )
+    try:
+        await message.reply_photo(
+            photo        = config.WAIFU_PICS[0],
+            caption      = text,
+            parse_mode   = enums.ParseMode.HTML,
+            reply_markup = keyboard,
+            has_spoiler  = True,
+        )
+    except Exception:
+        await message.reply_text(
+            text,
+            parse_mode=enums.ParseMode.HTML,
+            reply_markup=keyboard,
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -227,7 +239,10 @@ async def rank_tab_cb(client: Client, cq: CallbackQuery):
     # Show loading indicator
     await cq.answer(f"⏳ {sc('Loading')}...")
 
-    text     = await fetch()
+    try:
+        text = await fetch()
+    except Exception:
+        return await cq.answer("Leaderboard data is temporarily unavailable.", show_alert=True)
     keyboard = _build_keyboard(tab)
 
     try:
@@ -262,12 +277,15 @@ async def ctop_cmd(client: Client, message: Message):
         {"$limit": TOP_LIMIT},
     ]
 
-    # Fallback: use game_statsdb (global guesses, not per-group)
-    # For per-group tracking, guess.py needs to write to chatsdb user_guesses
-    # For now use game_statsdb as approximation
-    data = await game_statsdb.find(
-        {}, {"user_id": 1, "total_guesses": 1}
-    ).sort("total_guesses", -1).limit(TOP_LIMIT).to_list(TOP_LIMIT)
+    try:
+        data = await chat_guessdb.find(
+            {"chat_id": chat_id},
+            {"user_id": 1, "first_name": 1, "count": 1},
+        ).sort("count", -1).limit(TOP_LIMIT).to_list(TOP_LIMIT)
+    except Exception:
+        return await message.reply_text(
+            "❌ Group leaderboard data is temporarily unavailable."
+        )
 
     text = (
         f"<blockquote>"
@@ -281,17 +299,17 @@ async def ctop_cmd(client: Client, message: Message):
     else:
         for i, doc in enumerate(data):
             uid     = doc.get("user_id", 0)
-            guesses = doc.get("total_guesses", 0)
-            col_doc = await collectiondb.find_one({"user_id": uid}, {"first_name": 1})
-            name    = html.escape(
-                col_doc.get("first_name", str(uid)) if col_doc else str(uid)
-            )[:18]
+            guesses = doc.get("count", 0)
+            name    = html.escape(doc.get("first_name", str(uid)))[:18]
             text += f"{_medal(i)} <a href='tg://user?id={uid}'><b>{name}</b></a> — {guesses} 🎯\n"
 
-    await message.reply_photo(
-        photo       = config.WAIFU_PICS[0],
-        caption     = text,
-        parse_mode  = enums.ParseMode.HTML,
-        has_spoiler = True,
-  )
+    try:
+        await message.reply_photo(
+            photo       = config.WAIFU_PICS[0],
+            caption     = text,
+            parse_mode  = enums.ParseMode.HTML,
+            has_spoiler = True,
+        )
+    except Exception:
+        await message.reply_text(text, parse_mode=enums.ParseMode.HTML)
   

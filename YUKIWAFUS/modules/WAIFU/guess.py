@@ -9,7 +9,13 @@ from pyrogram.types import (
 )
 
 from YUKIWAFUS import app
-from YUKIWAFUS.database.Mangodb import collectiondb, balancedb, game_statsdb
+from YUKIWAFUS.database.Mangodb import (
+    collectiondb,
+    balancedb,
+    game_statsdb,
+    chat_guessdb,
+    chatsdb,
+)
 from YUKIWAFUS.utils.helpers import sc
 
 from YUKIWAFUS.modules.WAIFU.spawn import active_spawns, _blocked_users
@@ -101,10 +107,33 @@ async def _add_coins(user_id: int, amount: int) -> int:
     )
     return (result or {}).get("coins", amount)
 
-async def _inc_guesses(user_id: int):
+async def _inc_guesses(
+    user_id: int,
+    chat_id: int,
+    first_name: str,
+    chat_title: str = "",
+):
+    # Keep the existing global leaderboard and also record a true per-chat count
+    # for /ctop and the Groups tab in /rank.
     await game_statsdb.update_one(
         {"user_id": user_id},
         {"$inc": {"total_guesses": 1}},
+        upsert=True,
+    )
+    await chat_guessdb.update_one(
+        {"chat_id": chat_id, "user_id": user_id},
+        {
+            "$set": {"first_name": first_name},
+            "$inc": {"count": 1},
+        },
+        upsert=True,
+    )
+    await chatsdb.update_one(
+        {"chat_id": chat_id},
+        {
+            "$set": {"title": chat_title},
+            "$inc": {"guess_count": 1},
+        },
         upsert=True,
     )
 
@@ -199,7 +228,12 @@ async def guess_handler(client: Client, message: Message):
             user.first_name,
             {**waifu, "timestamp": time.time()},
         )
-        await _inc_guesses(user_id)
+        await _inc_guesses(
+            user_id,
+            chat_id,
+            user.first_name or str(user_id),
+            message.chat.title or "Private Chat",
+        )
 
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton(

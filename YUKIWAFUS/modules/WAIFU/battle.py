@@ -41,6 +41,14 @@ pending_battles: dict = {}  # chat_id → battle data
 
 
 # ── DB Helpers ────────────────────────────────────────────────────────────────
+def _waifu_photo(waifu: dict) -> str | None:
+    return waifu.get("img_url") or waifu.get("image") or waifu.get("photo")
+
+
+def _waifu_name(waifu: dict) -> str:
+    return waifu.get("name") or waifu.get("character_name") or "Unknown"
+
+
 async def get_best_waifu(user_id: int) -> dict | None:
     """Get user's highest rarity waifu for battle."""
     user = await collectiondb.find_one({"user_id": user_id})
@@ -122,19 +130,30 @@ async def battle_handler(client: Client, message: Message):
 
     cr = RARITY_EMOJI.get(challenger_waifu.get("rarity", "Common"), "◈")
 
-    msg = await message.reply_photo(
-        photo=challenger_waifu["img_url"],
-        caption=(
+    photo = _waifu_photo(challenger_waifu)
+    if not photo:
+        pending_battles.pop(chat_id, None)
+        return await message.reply_text("❌ Your best waifu has no usable image, so battle cannot start.")
+
+    try:
+        msg = await message.reply_photo(
+            photo=photo,
+            caption=(
             f"<blockquote>⚔️ <b>Battle Challenge!</b></blockquote>\n\n"
             f"🔥 <b><a href='tg://user?id={challenger_id}'>{escape(message.from_user.first_name)}</a></b> "
             f"challenges <b><a href='tg://user?id={opponent.id}'>{escape(opponent.first_name)}</a></b>!\n\n"
             f"Challenger's Waifu:\n"
-            f"{cr} <b>{challenger_waifu['name']}</b> — {challenger_waifu.get('rarity', 'Common')}\n\n"
+            f"{cr} <b>{escape(_waifu_name(challenger_waifu))}</b> — {challenger_waifu.get('rarity', 'Common')}\n\n"
             f"⏳ <b>{opponent.first_name}</b>, accept within {BATTLE_TIMEOUT}s!"
         ),
         parse_mode=enums.ParseMode.HTML,
-        reply_markup=keyboard,
-    )
+            reply_markup=keyboard,
+        )
+    except Exception:
+        pending_battles.pop(chat_id, None)
+        return await message.reply_text(
+            "❌ I could not send your waifu image. Please check that the card has a valid image URL."
+        )
 
     # Auto-expire
     await asyncio.sleep(BATTLE_TIMEOUT)
@@ -228,7 +247,8 @@ async def battle_accept(client: Client, cq: CallbackQuery):
 
     text = (
         f"<blockquote>⚔️ <b>Battle Result!</b></blockquote>\n\n"
-        f"{ce} <b>{escape(challenger_waifu['name'])}</b> vs {oe} <b>{escape(opponent_waifu['name'])}</b>\n\n"
+                    f"{ce} <b>{escape(_waifu_name(challenger_waifu))}</b> vs {oe} <b>{escape(_waifu_name(opponent_waifu))}</b>\n\n"
+
         f"<b>{escape(challenger_user.first_name)}</b>\n"
         f"❤️ {battle_bar(final_c_hp, c_max)} {final_c_hp}/{c_max}\n\n"
         f"<b>{escape(opponent_user.first_name)}</b>\n"
@@ -239,13 +259,16 @@ async def battle_accept(client: Client, cq: CallbackQuery):
         we = RARITY_EMOJI.get(winner_waifu.get("rarity", "Common"), "◈")
         text += (
             f"🏆 <b>{winner_name}</b> wins!\n"
-            f"{we} <b>{winner_waifu['name']}</b> is victorious!\n"
+            f"{we} <b>{escape(_waifu_name(winner_waifu))}</b> is victorious!\n"
             f"🪙 <b>+{BATTLE_REWARD} coins</b> → Balance: <b>{new_balance}</b>"
         )
     else:
         text += "🤝 <b>It's a draw!</b> No coins awarded."
 
-    photo = winner_waifu["img_url"] if winner_waifu else challenger_waifu["img_url"]
+    photo = _waifu_photo(winner_waifu) if winner_waifu else _waifu_photo(challenger_waifu)
+
+    if not photo:
+        return await cq.message.reply_text(text, parse_mode=enums.ParseMode.HTML)
 
     try:
         await cq.message.edit_media(
