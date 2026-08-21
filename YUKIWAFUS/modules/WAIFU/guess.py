@@ -242,25 +242,36 @@ async def guess_handler(client: Client, message: Message):
             )
         ]])
 
-        await message.reply_photo(
-            photo=waifu["img_url"],
-            caption=(
-                f"<blockquote>"
-                f"<emoji id='6291837599254322363'>🎊</emoji> "
-                f"<b>{mention} {sc('guessed correctly')}!</b>"
-                f"</blockquote>\n\n"
-                f"<b>📛 {sc('Name')} :</b> {escape(correct_name)}\n"
-                f"<b>🎬 {sc('Anime')} :</b> {escape(waifu.get('anime_name', waifu.get('anime', 'Unknown')))}\n"
-                f"<b>{emoji} {sc('Rarity')} :</b> {rarity}\n"
-                f"<b>🏷 {sc('Event')} :</b> {waifu.get('event', waifu.get('event_tag', 'Standard'))}\n"
-                f"<b>🆔 {sc('ID')} :</b> <code>{waifu_id}</code>\n\n"
-                f"<b>🌸 +{COINS_REWARD} {sc('Sakura')} →</b> "
-                f"<b>{new_balance:,} 🌸</b>\n"
-                f"<b>⏱ {sc('Time')} :</b> <b>{time_taken}s</b>"
-            ),
-            parse_mode=enums.ParseMode.HTML,
-            reply_markup=keyboard,
+        video = waifu.get("video") or waifu.get("video_id") or waifu.get("video_url") or waifu.get("animation")
+        name_marker = " [🎞️]" if video else ""
+        claim_caption = (
+            f"<blockquote>"
+            f"<emoji id='6291837599254322363'>🎊</emoji> "
+            f"<b>{mention} {sc('guessed correctly')}!</b>"
+            f"</blockquote>\n\n"
+            f"<b>📛 {sc('Name')} :</b> {escape(correct_name)}{name_marker}\n"
+            f"<b>🎬 {sc('Anime')} :</b> {escape(waifu.get('anime_name', waifu.get('anime', 'Unknown')))}\n"
+            f"<b>{emoji} {sc('Rarity')} :</b> {rarity}\n"
+            f"<b>🏷 {sc('Event')} :</b> {waifu.get('event', waifu.get('event_tag', 'Standard'))}\n"
+            f"<b>🆔 {sc('ID')} :</b> <code>{waifu_id}</code>\n\n"
+            f"<b>🌸 +{COINS_REWARD} {sc('Sakura')} →</b> "
+            f"<b>{new_balance:,} 🌸</b>\n"
+            f"<b>⏱ {sc('Time')} :</b> <b>{time_taken}s</b>"
         )
+        if video:
+            await message.reply_video(
+                video=video,
+                caption=claim_caption,
+                parse_mode=enums.ParseMode.HTML,
+                reply_markup=keyboard,
+            )
+        else:
+            await message.reply_photo(
+                photo=waifu["img_url"],
+                caption=claim_caption,
+                parse_mode=enums.ParseMode.HTML,
+                reply_markup=keyboard,
+            )
 
     # ── Wrong ─────────────────────────────────────────────────────────────────
     else:

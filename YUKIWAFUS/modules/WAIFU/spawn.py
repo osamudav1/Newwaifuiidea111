@@ -210,12 +210,21 @@ async def spawn_waifu(client: Client, chat_id: int):
     )
 
     try:
-        msg = await client.send_photo(
-            chat_id=chat_id,
-            photo=waifu["img_url"],
-            caption=caption,
-            parse_mode=enums.ParseMode.HTML,
-        )
+        video = waifu.get("video") or waifu.get("video_id") or waifu.get("video_url") or waifu.get("animation")
+        if video:
+            msg = await client.send_video(
+                chat_id=chat_id,
+                video=video,
+                caption=caption,
+                parse_mode=enums.ParseMode.HTML,
+            )
+        else:
+            msg = await client.send_photo(
+                chat_id=chat_id,
+                photo=waifu["img_url"],
+                caption=caption,
+                parse_mode=enums.ParseMode.HTML,
+            )
 
         active_spawns[chat_id] = {
             **waifu,

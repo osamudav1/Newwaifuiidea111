@@ -118,11 +118,13 @@ def _check_caption(waifu: dict, raw_id: str, total: int, top_ten: list[tuple[str
     rarity = waifu.get("rarity", "Common")
     event = waifu.get("event", waifu.get("event_tag", "Standard"))
     emoji = RARITY_EMOJI.get(rarity, "◈")
+    video = waifu.get("video") or waifu.get("video_id") or waifu.get("video_url") or waifu.get("animation")
+    name_marker = " [🎞️]" if video else ""
     lines = [
         "◈<b>OwO! Check out this character</b>◈",
         "",
         f"🎬 <b>{escape(anime)}</b>" if anime else None,
-        f"<code>{escape(str(raw_id))}</code>: <b>{escape(str(name))}</b>",
+        f"<code>{escape(str(raw_id))}</code>: <b>{escape(str(name))}{name_marker}</b>",
         f"(🪞 <b>RARITY: {escape(str(rarity))}</b>)",
         "",
         f"{emoji} <b>{escape(str(event))}</b> {emoji}",
@@ -160,6 +162,12 @@ async def check_waifu(client: Client, message: Message):
             )
         total, top_ten = await _catcher_stats(raw_id, waifu)
         caption = _check_caption(waifu, raw_id, total, top_ten)
+        video = waifu.get("video") or waifu.get("video_id") or waifu.get("video_url") or waifu.get("animation")
+        if video:
+            try:
+                return await message.reply_video(video=video, caption=caption, parse_mode=enums.ParseMode.HTML)
+            except Exception:
+                LOGGER.warning("/check video send failed for id %s; trying photo/text", raw_id)
         photo = waifu.get("img_url") or waifu.get("image") or waifu.get("photo")
         if photo:
             return await message.reply_photo(photo=photo, caption=caption, parse_mode=enums.ParseMode.HTML)

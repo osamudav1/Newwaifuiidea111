@@ -56,16 +56,17 @@ async def _next_waifu_id() -> int:
     return int((latest or {}).get("waifu_id", 0)) + 1
 
 
-def build_log_caption(name, anime_name, rarity, event, img_url, added_by_name, added_by_id):
+def build_log_caption(name, anime_name, rarity, event, img_url, added_by_name, added_by_id, video=None):
     emoji = RARITY_EMOJI.get(rarity, "◈")
     now = datetime.utcnow().strftime("%d %b %Y • %H:%M UTC")
+    media_line = "🎞️ <b>AMV:</b> Attached" if video else f"🖼 <b>Image:</b> <a href='{escape(str(img_url))}'>View</a>"
     return (
         "<blockquote>🌸 <b>New Waifu Added!</b></blockquote>\n\n"
         f"📛 <b>Character:</b> {escape(name)}\n"
         f"🎬 <b>Anime:</b> {escape(anime_name)}\n"
         f"{emoji} <b>Rarity:</b> {rarity}\n"
         f"🏷 <b>Event:</b> {escape(event)}\n"
-        f"🖼 <b>Image:</b> <a href='{escape(str(img_url))}'>View</a>\n\n"
+        f"{media_line}\n\n"
         f"<blockquote>👤 <b>Added by:</b> <a href='tg://user?id={added_by_id}'>{escape(added_by_name)}</a>\n"
         f"🕐 <b>Time:</b> {now}</blockquote>"
     )
@@ -118,14 +119,15 @@ async def _show_confirmation(message: Message, data: dict):
         f"📛 <b>Character:</b> {escape(data['name'])}\n"
         f"🎬 <b>Anime:</b> {escape(data['anime_name'])}\n"
         f"🌟 <b>Rarity:</b> {data['rarity']}\n"
-        f"🏷 <b>Event:</b> {escape(data['event'])}\n\n"
+        f"🏷 <b>Event:</b> {escape(data['event'])}\n"
+        f"{'🎞️ <b>Media:</b> AMV video' if data.get('video') else '🖼 <b>Media:</b> Photo'}\n\n"
         "Press <b>Confirm</b> to save or <b>Cancel</b> to discard.",
         parse_mode=enums.ParseMode.HTML,
         reply_markup=keyboard,
     )
 
 
-@app.on_message(filters.photo & ADMIN_FILTER & filters.private)
+@app.on_message((filters.photo | filters.video) & ADMIN_FILTER & filters.private)
 async def photo_add_handler(client: Client, message: Message):
     try:
         from YUKIWAFUS.modules.ADMIN.edit import edit_photo_handler, has_edit_session
@@ -136,11 +138,12 @@ async def photo_add_handler(client: Client, message: Message):
     if message.caption:
         return await auto_addwaifu_handler(client, message)
     _PENDING[_key(message)] = {
-        "img_url": message.photo.file_id,
+        "img_url": message.photo.file_id if message.photo else None,
+        "video": message.video.file_id if message.video else None,
         "step": "name",
         "created_at": time.monotonic(),
     }
-    await message.reply_text("📷 Photo received. Starting add-waifu setup...")
+    await message.reply_text("🎞️ AMV video received. Starting add-waifu setup..." if message.video else "📷 Photo received. Starting add-waifu setup...")
     await _ask_name(message)
 
 
@@ -218,14 +221,14 @@ async def addwaifu_confirm_callback(client: Client, callback: CallbackQuery):
     _PENDING.pop(key, None)
     await callback.answer("Saving waifu...")
     await save_waifu(
-        client, callback.message, data["name"], data["anime_name"], data["img_url"],
-        data["rarity"], data["event"], actor=callback.from_user, reply_target=callback.message,
+        client, callback.message, data["name"], data["anime_name"], data.get("img_url"),
+        data["rarity"], data["event"], video=data.get("video"), actor=callback.from_user, reply_target=callback.message,
     )
 
 
 async def save_waifu(
     client, message, name, anime_name, img_url, rarity, event,
-    *, actor=None, reply_target=None,
+    *, video=None, actor=None, reply_target=None,
 ):
     user = actor or message.from_user
     target = reply_target or message
@@ -253,29 +256,51 @@ async def save_waifu(
             "added_by_id": user.id,
             "date": datetime.utcnow().strftime("%d/%m/%Y"),
         }
+        if video:
+            doc["video"] = video
         await waifudb.insert_one(doc)
         await processing.delete()
         emoji = RARITY_EMOJI.get(rarity, "◈")
-        await target.reply_photo(
-            photo=img_url,
-            caption=(
-                f"✅ <b>Waifu Added!</b>\n\n"
-                f"🆔 <b>ID:</b> <code>{waifu_id}</code>\n"
-                f"📛 <b>Character:</b> {escape(name)}\n"
-                f"🎬 <b>Anime:</b> {escape(anime_name)}\n"
-                f"{emoji} <b>Rarity:</b> {rarity}\n"
-                f"🏷 <b>Event:</b> {escape(event)}"
-            ),
-            parse_mode=enums.ParseMode.HTML,
+        media_marker = " [🎞️]" if video else ""
+        result_caption = (
+            f"✅ <b>Waifu Added!</b>\n\n"
+            f"🆔 <b>ID:</b> <code>{waifu_id}</code>\n"
+            f"📛 <b>Character:</b> {escape(name)}{media_marker}\n"
+            f"🎬 <b>Anime:</b> {escape(anime_name)}\n"
+            f"{emoji} <b>Rarity:</b> {rarity}\n"
+            f"🏷 <b>Event:</b> {escape(event)}"
         )
+        if video:
+            await target.reply_video(
+                video=video,
+                caption=result_caption,
+                parse_mode=enums.ParseMode.HTML,
+            )
+        else:
+            await target.reply_photo(
+                photo=img_url,
+                caption=result_caption,
+                parse_mode=enums.ParseMode.HTML,
+            )
         if config.LOG_CHANNEL:
             try:
-                await client.send_photo(
-                    chat_id=config.LOG_CHANNEL,
-                    photo=img_url,
-                    caption=build_log_caption(name, anime_name, rarity, event, img_url, user.first_name, user.id),
-                    parse_mode=enums.ParseMode.HTML,
+                log_caption = build_log_caption(
+                    name, anime_name, rarity, event, img_url, user.first_name, user.id, video=video
                 )
+                if video:
+                    await client.send_video(
+                        chat_id=config.LOG_CHANNEL,
+                        video=video,
+                        caption=log_caption,
+                        parse_mode=enums.ParseMode.HTML,
+                    )
+                else:
+                    await client.send_photo(
+                        chat_id=config.LOG_CHANNEL,
+                        photo=img_url,
+                        caption=log_caption,
+                        parse_mode=enums.ParseMode.HTML,
+                    )
             except Exception as exc:
                 LOGGER.warning("Waifu log send failed: %s", exc)
     except Exception as exc:
@@ -291,7 +316,7 @@ async def addwaifu_cmd_handler(client: Client, message: Message):
     args = message.text.split(None, 1)
     if len(args) < 2:
         return await message.reply_text(
-            "📷 Send a photo to start: Character name → Anime name → Rarity → Event → Confirm.",
+            "🎞️ Send a photo or AMV video to start: Character name → Anime name → Rarity → Event → Confirm.",
             parse_mode=enums.ParseMode.HTML,
         )
     parts = [part.strip() for part in args[1].split("|")]
@@ -324,4 +349,9 @@ async def auto_addwaifu_handler(client: Client, message: Message):
     rarity = _normal_rarity(rarity_text)
     if not rarity:
         return await message.reply_text(f"❌ Invalid rarity. Valid: {', '.join(VALID_RARITIES)}")
-    await save_waifu(client, message, name, anime_name, message.photo.file_id, rarity, _event_value(event))
+    await save_waifu(
+        client, message, name, anime_name,
+        message.photo.file_id if message.photo else None,
+        rarity, _event_value(event),
+        video=message.video.file_id if message.video else None,
+    )

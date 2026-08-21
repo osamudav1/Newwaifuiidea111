@@ -99,7 +99,8 @@ async def build_harem_text(
         for w in chars:
             wid = w.get("waifu_id", w.get("name"))
             count = counts.get(wid, 1)
-            text += f"  ◈ {w['name']} ×{count}\n"
+            marker = " [🎞️]" if (w.get("video") or w.get("video_id") or w.get("video_url") or w.get("animation")) else ""
+            text += f"  ◈ {w['name']}{marker} ×{count}\n"
         text += "\n"
 
     return text, total_pages

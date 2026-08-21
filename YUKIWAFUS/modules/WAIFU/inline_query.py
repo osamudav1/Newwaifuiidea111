@@ -64,11 +64,12 @@ def _build_collection_caption(waifu: dict, owner_name: str, count: int) -> str:
     waifu_id = waifu.get("waifu_id", "N/A")
     anime_name = waifu.get("anime_name", waifu.get("anime", "Unknown"))
     event = waifu.get("event", waifu.get("event_tag", "Standard"))
+    marker = " [🎞️]" if (waifu.get("video") or waifu.get("video_id") or waifu.get("video_url") or waifu.get("animation")) else ""
     return (
         f"<blockquote>"
         f"<b>🌸 {escape(owner_name)}'s Collection</b>"
         f"</blockquote>\n\n"
-        f"<b>📛 Name :</b> {escape(waifu.get('name', '?'))}\n"
+        f"<b>📛 Name :</b> {escape(waifu.get('name', '?'))}{marker}\n"
         f"<b>🎬 Anime :</b> {escape(anime_name)}\n"
         f"<b>{emoji} Rarity :</b> {rarity}\n"
         f"<b>🏷 Event :</b> {escape(event)}\n"
@@ -83,11 +84,12 @@ def _build_global_caption(waifu: dict) -> str:
     waifu_id = waifu.get("waifu_id", "N/A")
     anime_name = waifu.get("anime_name", waifu.get("anime", "Unknown"))
     event = waifu.get("event", waifu.get("event_tag", "Standard"))
+    marker = " [🎞️]" if (waifu.get("video") or waifu.get("video_id") or waifu.get("video_url") or waifu.get("animation")) else ""
     return (
         f"<blockquote>"
         f"<b>🌸 Waifu Info</b>"
         f"</blockquote>\n\n"
-        f"<b>📛 Name :</b> {escape(waifu.get('name', '?'))}\n"
+        f"<b>📛 Name :</b> {escape(waifu.get('name', '?'))}{marker}\n"
         f"<b>🎬 Anime :</b> {escape(anime_name)}\n"
         f"<b>{emoji} Rarity :</b> {rarity}\n"
         f"<b>🏷 Event :</b> {escape(event)}\n"

@@ -61,6 +61,13 @@ def _photo(card: dict) -> str | None:
     return None
 
 
+def _video(card: dict) -> str | None:
+    for field in ("video", "video_id", "video_url", "animation"):
+        if card.get(field):
+            return str(card[field])
+    return None
+
+
 async def _find_api_card(card_id: int) -> dict | None:
     skip = 0
     for _ in range(100):
@@ -84,10 +91,10 @@ def _skip_keyboard(user_id: int) -> InlineKeyboardMarkup:
 async def _ask_step(message: Message, data: dict) -> None:
     card = data["original"]
     step = data["step"]
-    if step == "photo":
-        prompt = "🖼 <b>Step 1/5 — New photo</b>"
-        details = "Send a new photo, or press <b>Skip</b> to keep the current photo."
-        current = _photo(card) or "No image"
+    if step == "media":
+        prompt = "🖼🎞️ <b>Step 1/5 — New photo or AMV video</b>"
+        details = "Send a new photo or video, or press <b>Skip</b> to keep the current media."
+        current = "AMV video attached" if _video(card) else (_photo(card) or "No media")
     elif step == "name":
         prompt = "📛 <b>Step 2/5 — Character name</b>"
         details = "Example: <code>Rem</code>"
@@ -129,6 +136,8 @@ async def _save_edit(message: Message, data: dict) -> None:
             api_fields["name"] = updates["name"]
         if "img_url" in updates:
             api_fields["img_url"] = updates["img_url"]
+        if "video" in updates:
+            api_fields["video"] = updates["video"]
         if "rarity" in updates:
             api_fields["rarity"] = updates["rarity"]
         if "anime_name" in updates:
@@ -168,11 +177,17 @@ async def _save_edit(message: Message, data: dict) -> None:
     caption = (
         "✅ <b>Card replaced successfully!</b>\n\n"
         f"🆔 <b>ID:</b> <code>{data['card_id']}</code>\n"
-        f"📛 <b>Character:</b> {escape(_character(card))}\n"
+        f"📛 <b>Character:</b> {escape(_character(card))}{' [🎞️]' if _video(card) else ''}\n"
         f"🎬 <b>Anime:</b> {escape(_anime(card))}\n"
         f"{emoji} <b>Rarity:</b> {escape(_rarity(card))}\n"
         f"🏷 <b>Event:</b> {escape(_event(card))}"
     )
+    video = _video(card)
+    if video:
+        try:
+            return await message.reply_video(video, caption=caption, parse_mode=enums.ParseMode.HTML)
+        except Exception:
+            pass
     photo = _photo(card)
     if photo:
         try:
@@ -185,8 +200,8 @@ async def _save_edit(message: Message, data: dict) -> None:
 async def _advance(message: Message, data: dict, value: str | None = None) -> None:
     step = data["step"]
     if value is not None:
-        if step == "photo":
-            data["updates"]["img_url"] = value
+        if step == "media":
+            data["updates"].update({"img_url": value, "video": None, "video_id": None, "video_url": None, "animation": None})
             if "image" in data["original"]:
                 data["updates"]["image"] = value
             if "photo" in data["original"]:
@@ -201,7 +216,7 @@ async def _advance(message: Message, data: dict, value: str | None = None) -> No
             data["updates"].update(event=value, event_tag=value)
 
     next_step = {
-        "photo": "name",
+        "media": "name",
         "name": "rarity",
         "rarity": "anime_name",
         "anime_name": "event",
@@ -251,7 +266,7 @@ async def edit_cmd_handler(client: Client, message: Message):
         "original": card,
         "source": source,
         "updates": {},
-        "step": "photo",
+        "step": "media",
         "created_at": time.monotonic(),
     }
     await message.reply_text(
@@ -262,15 +277,23 @@ async def edit_cmd_handler(client: Client, message: Message):
     await _ask_step(message, _PENDING[key])
 
 
-@app.on_message(filters.photo & OWNER_FILTER & filters.private)
+@app.on_message((filters.photo | filters.video) & OWNER_FILTER & filters.private)
 async def edit_photo_handler(client: Client, message: Message):
     data = _PENDING.get(_key(message))
-    if not data or data["step"] != "photo":
+    if not data or data["step"] != "media":
         return
     if time.monotonic() - data["created_at"] > SESSION_TTL:
         _PENDING.pop(_key(message), None)
         return await message.reply_text("⌛ This edit session expired. Send `/edit <id>` again.")
-    await _advance(message, data, message.photo.file_id)
+    if message.video:
+        data["updates"].update({"video": message.video.file_id, "video_id": message.video.file_id, "img_url": None, "image": None, "photo": None})
+        if "image" in data["original"]:
+            data["updates"]["image"] = None
+        if "photo" in data["original"]:
+            data["updates"]["photo"] = None
+        await _advance(message, data)
+    else:
+        await _advance(message, data, message.photo.file_id)
 
 
 @app.on_message(filters.text & OWNER_FILTER & filters.private)
@@ -293,8 +316,8 @@ async def edit_wizard_handler(client: Client, message: Message):
         return await _advance(message, data)
 
     step = data["step"]
-    if step == "photo":
-        return await message.reply_text("❌ Please send a photo or press Skip.")
+    if step == "media":
+        return await message.reply_text("❌ Please send a photo/video or press Skip.")
     if step == "name":
         if not 1 <= len(text) <= 100:
             return await message.reply_text("❌ Character name must be between 1 and 100 characters.")
