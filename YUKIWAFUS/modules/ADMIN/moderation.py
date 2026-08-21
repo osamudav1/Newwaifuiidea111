@@ -74,11 +74,23 @@ def _ban_status(record: dict) -> tuple[bool, str]:
     return True, f"{days} Day {hours} Hours {minutes} Min"
 
 
-def _status_text(user_id: int, record: dict, remaining_label: str) -> str:
+def _display_name(user) -> str:
+    parts = [getattr(user, "first_name", None), getattr(user, "last_name", None)]
+    name = " ".join(str(part).strip() for part in parts if part and str(part).strip())
+    return escape(name or "Unknown User")
+
+
+def _status_text(
+    user_id: int,
+    record: dict,
+    remaining_label: str,
+    display_name: str = "Unknown User",
+) -> str:
     reason = escape(str(record.get("reason") or "Not provided"))
     return (
         "🚫 <b>GLOBAL BAN ACTIVE</b>\n\n"
-        f"👤 User: <code>{user_id}</code>\n"
+        f"👤Name : {display_name}\n"
+        f"👤 Id: <code>{user_id}</code>\n"
         f"⏳ Time : {escape(remaining_label)}\n"
         f"📝 Reason: {reason}\n\n"
         "Only <code>/check</code> is available."
@@ -221,7 +233,7 @@ async def global_ban_guard(client: Client, message: Message):
 
     try:
         await message.reply_text(
-            _status_text(user.id, record, expiry_label),
+            _status_text(user.id, record, expiry_label, _display_name(user)),
             reply_to_message_id=message.id,
             parse_mode=enums.ParseMode.HTML,
         )
