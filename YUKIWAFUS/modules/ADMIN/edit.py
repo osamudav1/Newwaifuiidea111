@@ -143,26 +143,34 @@ async def _save_edit(message: Message, data: dict) -> None:
         if "anime_name" in updates:
             api_fields["anime_name"] = updates["anime_name"]
         if "event" in updates:
+            # Different API deployments expose this field as either `event`
+            # or the legacy `event_tag`; send both so the value is preserved.
+            api_fields["event"] = updates["event"]
             api_fields["event_tag"] = updates["event"]
         try:
             saved = bool(await update_waifu(config.WAIFU_API_KEY, _character(data["original"]), api_fields))
         except Exception as exc:
             LOGGER.warning("API /edit update failed; using local override: %s", exc)
 
-    if not saved:
+    if source == "api":
+        # Always keep a local override.  `/check` reads local cards first, so
+        # an API success must not leave the bot displaying stale API metadata.
         try:
-            if source == "api":
-                local_card = dict(data["original"])
-                local_card.update(updates)
-                local_card["waifu_id"] = data["card_id"]
-                local_card.setdefault("id", data["card_id"])
-                local_card["source"] = "api_override"
-                await waifudb.replace_one({"waifu_id": data["card_id"]}, local_card, upsert=True)
-            else:
-                result = await waifudb.update_one(data["query"], {"$set": updates})
-                if getattr(result, "matched_count", 1) == 0:
-                    _PENDING.pop(session_key, None)
-                    return await message.reply_text("❌ This card no longer exists. Edit cancelled.")
+            local_card = dict(data["original"])
+            local_card.update(updates)
+            local_card["waifu_id"] = data["card_id"]
+            local_card["id"] = data["card_id"]
+            local_card["source"] = "api_override"
+            await waifudb.replace_one({"waifu_id": data["card_id"]}, local_card, upsert=True)
+            saved = True
+        except Exception as exc:
+            LOGGER.exception("/edit API override save failed: %s", exc)
+    elif not saved:
+        try:
+            result = await waifudb.update_one(data["query"], {"$set": updates})
+            if getattr(result, "matched_count", 1) == 0:
+                _PENDING.pop(session_key, None)
+                return await message.reply_text("❌ This card no longer exists. Edit cancelled.")
             saved = True
         except Exception as exc:
             LOGGER.exception("/edit database update failed: %s", exc)
