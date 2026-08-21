@@ -127,6 +127,12 @@ async def _show_confirmation(message: Message, data: dict):
 
 @app.on_message(filters.photo & ADMIN_FILTER & filters.private)
 async def photo_add_handler(client: Client, message: Message):
+    try:
+        from YUKIWAFUS.modules.ADMIN.edit import edit_photo_handler, has_edit_session
+        if await has_edit_session(_key(message)):
+            return await edit_photo_handler(client, message)
+    except Exception:
+        pass
     if message.caption:
         return await auto_addwaifu_handler(client, message)
     _PENDING[_key(message)] = {
@@ -143,6 +149,12 @@ async def addwaifu_wizard_handler(client: Client, message: Message):
     key = _key(message)
     data = _PENDING.get(key)
     if not data:
+        try:
+            from YUKIWAFUS.modules.ADMIN.edit import edit_wizard_handler, has_edit_session
+            if await has_edit_session(key):
+                return await edit_wizard_handler(client, message)
+        except Exception:
+            pass
         return
     if time.monotonic() - data.get("created_at", 0) > SESSION_TTL:
         _PENDING.pop(key, None)

@@ -9,6 +9,7 @@ import config
 from YUKIWAFUS import app
 from YUKIWAFUS.Logging import LOGGER
 from YUKIWAFUS.database.Mangodb import waifudb
+from YUKIWAFUS.utils.api import get_waifu_list, update_waifu
 
 RARITY_EMOJI = {
     "Common": "⚪",
@@ -60,6 +61,19 @@ def _photo(card: dict) -> str | None:
     return None
 
 
+async def _find_api_card(card_id: int) -> dict | None:
+    skip = 0
+    for _ in range(100):
+        cards = await get_waifu_list(skip=skip, limit=1000) or []
+        for card in cards:
+            if str(card.get("waifu_id", card.get("id", ""))) == str(card_id):
+                return card
+        if len(cards) < 1000:
+            break
+        skip += len(cards)
+    return None
+
+
 def _skip_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("⏭ Skip", callback_data=f"edit_skip:{user_id}"),
@@ -96,29 +110,60 @@ async def _ask_step(message: Message, data: dict) -> None:
         "Send <code>Skip</code> or press the button to keep the current value.\n"
         "Send <code>/cancel</code> to stop.",
         parse_mode=enums.ParseMode.HTML,
-        reply_markup=_skip_keyboard(message.from_user.id),
+        reply_markup=_skip_keyboard(data["user_id"]),
     )
 
 
 async def _save_edit(message: Message, data: dict) -> None:
     updates = data["updates"]
+    session_key = (message.chat.id, data["user_id"])
     if not updates:
-        _PENDING.pop(_key(message), None)
+        _PENDING.pop(session_key, None)
         return await message.reply_text("ℹ️ No fields changed. The card remains unchanged.")
 
-    try:
-        result = await waifudb.update_one(data["query"], {"$set": updates})
-    except Exception as exc:
-        LOGGER.exception("/edit update failed: %s", exc)
-        return await message.reply_text("❌ Could not update the card database. Please try again.")
+    source = data.get("source", "local")
+    saved = False
+    if source == "api" and config.WAIFU_API_KEY:
+        api_fields = {}
+        if "name" in updates:
+            api_fields["name"] = updates["name"]
+        if "img_url" in updates:
+            api_fields["img_url"] = updates["img_url"]
+        if "rarity" in updates:
+            api_fields["rarity"] = updates["rarity"]
+        if "anime_name" in updates:
+            api_fields["anime_name"] = updates["anime_name"]
+        if "event" in updates:
+            api_fields["event_tag"] = updates["event"]
+        try:
+            saved = bool(await update_waifu(config.WAIFU_API_KEY, _character(data["original"]), api_fields))
+        except Exception as exc:
+            LOGGER.warning("API /edit update failed; using local override: %s", exc)
 
-    if getattr(result, "matched_count", 1) == 0:
-        _PENDING.pop(_key(message), None)
-        return await message.reply_text("❌ This card no longer exists. Edit cancelled.")
+    if not saved:
+        try:
+            if source == "api":
+                local_card = dict(data["original"])
+                local_card.update(updates)
+                local_card["waifu_id"] = data["card_id"]
+                local_card.setdefault("id", data["card_id"])
+                local_card["source"] = "api_override"
+                await waifudb.replace_one({"waifu_id": data["card_id"]}, local_card, upsert=True)
+            else:
+                result = await waifudb.update_one(data["query"], {"$set": updates})
+                if getattr(result, "matched_count", 1) == 0:
+                    _PENDING.pop(session_key, None)
+                    return await message.reply_text("❌ This card no longer exists. Edit cancelled.")
+            saved = True
+        except Exception as exc:
+            LOGGER.exception("/edit database update failed: %s", exc)
+
+    if not saved:
+        return await message.reply_text("❌ Could not update the card. Check API key/database and try again.")
 
     card = dict(data["original"])
     card.update(updates)
-    _PENDING.pop(_key(message), None)
+    _PENDING.pop(session_key, None)
     emoji = RARITY_EMOJI.get(_rarity(card), "◈")
     caption = (
         "✅ <b>Card replaced successfully!</b>\n\n"
@@ -179,12 +224,20 @@ async def edit_cmd_handler(client: Client, message: Message):
 
     card_id = int(args[1])
     key = _key(message)
-    query = {"$or": [{"waifu_id": card_id}, {"id": card_id}]}
+    query = {"$or": [{"waifu_id": card_id}, {"id": card_id}, {"waifu_id": str(card_id)}, {"id": str(card_id)}]}
+    source = "local"
     try:
         card = await waifudb.find_one(query)
     except Exception as exc:
-        LOGGER.exception("/edit lookup failed: %s", exc)
-        return await message.reply_text("❌ Waifu database is unavailable. Please try again later.")
+        LOGGER.warning("/edit local lookup failed: %s", exc)
+        card = None
+    if not card:
+        try:
+            card = await _find_api_card(card_id)
+            source = "api" if card else "local"
+        except Exception as exc:
+            LOGGER.warning("/edit API lookup failed: %s", exc)
+            card = None
     if not card:
         return await message.reply_text(
             f"❌ No card found with ID <code>{card_id}</code>.",
@@ -193,8 +246,10 @@ async def edit_cmd_handler(client: Client, message: Message):
 
     _PENDING[key] = {
         "card_id": card_id,
+        "user_id": message.from_user.id,
         "query": query,
         "original": card,
+        "source": source,
         "updates": {},
         "step": "photo",
         "created_at": time.monotonic(),
@@ -284,4 +339,3 @@ async def has_edit_session(key: tuple[int, int]) -> bool:
 
 
 __all__ = ["has_edit_session"]
-
