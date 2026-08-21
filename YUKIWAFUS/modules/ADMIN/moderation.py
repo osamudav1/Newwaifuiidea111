@@ -62,26 +62,26 @@ def _command_name(message: Message) -> str:
 def _ban_status(record: dict) -> tuple[bool, str]:
     expires_at = record.get("expires_at")
     if not expires_at:
-        return True, "permanent"
+        return True, "Permanent"
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at <= datetime.now(timezone.utc):
-        return False, "expired"
-    return True, expires_at.strftime("%Y-%m-%d %H:%M UTC")
+    remaining = expires_at - datetime.now(timezone.utc)
+    total_minutes = int(remaining.total_seconds() // 60)
+    if total_minutes < 0:
+        return False, "Expired"
+    days, remainder = divmod(total_minutes, 24 * 60)
+    hours, minutes = divmod(remainder, 60)
+    return True, f"{days} Day {hours} Hours {minutes} Min"
 
 
-def _status_text(user_id: int, record: dict, expiry_label: str) -> str:
+def _status_text(user_id: int, record: dict, remaining_label: str) -> str:
     reason = escape(str(record.get("reason") or "Not provided"))
-    if record.get("permanent") or not record.get("expires_at"):
-        duration = "Permanent — Owner /ungban only"
-    else:
-        duration = f"Until: {escape(expiry_label)}"
     return (
         "🚫 <b>GLOBAL BAN ACTIVE</b>\n\n"
         f"👤 User: <code>{user_id}</code>\n"
-        f"⏳ {duration}\n"
+        f"⏳ Time : {escape(remaining_label)}\n"
         f"📝 Reason: {reason}\n\n"
-        "⚠️ This user cannot use bot commands. Only <code>/check</code> is available."
+        "Only <code>/check</code> is available."
     )
 
 
@@ -172,9 +172,9 @@ async def gban_setup_handler(client: Client, message: Message):
         return await message.reply_text("❌ Global ban failed because the database is unavailable.")
 
     _PENDING_GBANS.pop(key, None)
-    expiry_label = "permanent" if days == 0 else (now + timedelta(days=days)).strftime("%Y-%m-%d %H:%M UTC")
+    _, remaining_label = _ban_status(record)
     await message.reply_text(
-        "✅ <b>Global ban started</b>\n\n" + _status_text(user_id, record, expiry_label),
+        "✅ <b>Global ban started</b>\n\n" + _status_text(user_id, record, remaining_label),
         parse_mode=enums.ParseMode.HTML,
     )
     raise StopPropagation
@@ -222,6 +222,7 @@ async def global_ban_guard(client: Client, message: Message):
     try:
         await message.reply_text(
             _status_text(user.id, record, expiry_label),
+            reply_to_message_id=message.id,
             parse_mode=enums.ParseMode.HTML,
         )
     except Exception:
